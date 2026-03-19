@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import * as childProcess from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -155,8 +155,12 @@ export function hasTempoWallet(options: {
   return resolveTempoWallet(options) !== undefined;
 }
 
-export function createSystemSecretStore(): SecretStore {
-  const platform = os.platform();
+export function createSystemSecretStore(options: {
+  platform?: (() => NodeJS.Platform) | undefined;
+  execFileSync?: typeof childProcess.execFileSync | undefined;
+} = {}): SecretStore {
+  const platform = (options.platform ?? os.platform)();
+  const execFileSync = options.execFileSync ?? childProcess.execFileSync;
 
   if (platform === 'darwin') {
     return {
@@ -172,18 +176,15 @@ export function createSystemSecretStore(): SecretStore {
         }
       },
       set(serviceName, accountName, secret) {
-        try {
-          execFileSync(
-            'security',
-            ['delete-generic-password', '-s', serviceName, '-a', accountName],
-            { stdio: 'ignore' }
-          );
-        } catch {}
-
+        // Prompt mode keeps the secret out of the child process argv.
         execFileSync(
           'security',
-          ['add-generic-password', '-s', serviceName, '-a', accountName, '-w', secret],
-          { stdio: 'ignore' }
+          ['add-generic-password', '-s', serviceName, '-a', accountName, '-U', '-w'],
+          {
+            input: `${secret}\n${secret}\n`,
+            stdio: ['pipe', 'ignore', 'ignore'],
+            encoding: 'utf8'
+          }
         );
       },
       delete(serviceName, accountName) {

@@ -561,7 +561,14 @@ async function extractTocFromNcx(
 
 export function parseNcxToc(ncxXml: string, spine: SpineItem[], ncxHref: string): TocEntry[] {
   const ncxDir = path.dirname(ncxHref);
-  const parsed = xmlParser.parse(ncxXml);
+  let parsed: any;
+
+  try {
+    parsed = xmlParser.parse(ncxXml);
+  } catch {
+    return [];
+  }
+
   const navPoints: any[] = parsed?.ncx?.navMap?.navPoint ?? [];
 
   return parseNavPoints(navPoints, spine, ncxDir, 0);

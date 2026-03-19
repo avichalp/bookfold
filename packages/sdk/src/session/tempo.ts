@@ -245,23 +245,18 @@ export class TempoSessionClient {
       throw new Error(normalizeSessionError(error));
     }
 
-    this.lastRequestUrl = resolveRequestUrl(input);
-    this.lastRequestInit = cloneRequestInit(init);
     const receipt = coerceReceipt(response.receipt);
     const channelId = typeof response.channelId === 'string' ? response.channelId : this.manager.channelId;
-    const cumulative = typeof response.cumulative === 'bigint'
-      ? response.cumulative.toString()
-      : this.state.cumulative;
-
-    this.captureCloseContext(response.challenge);
-
     this.state.requestCount += 1;
-    this.state.cumulative = cumulative;
-    this.state.channelId = channelId ?? undefined;
-    if (receipt) {
-      this.state.lastReceipt = receipt;
-      this.state.spent = receipt.spent;
-    }
+    this.mergeRequestState({
+      receipt,
+      channelId: channelId ?? undefined,
+      requestUrl: resolveRequestUrl(input),
+      requestInit: cloneRequestInit(init),
+      challenge: response.challenge,
+      closeContext: extractCloseContext(response.challenge),
+      cumulative: resolveResponseCumulative(response, receipt)
+    });
 
     await this.persistRecoveryEntry();
 
@@ -288,36 +283,55 @@ export class TempoSessionClient {
     this.state.closeError = undefined;
   }
 
-  private captureCloseContext(challenge: unknown): void {
-    if (!challenge || typeof challenge !== 'object') {
-      return;
+  private mergeRequestState(update: {
+    receipt?: TempoSessionReceipt | undefined;
+    channelId?: string | undefined;
+    requestUrl: string;
+    requestInit: RequestInit;
+    challenge: unknown;
+    closeContext?: TempoCloseContext | undefined;
+    cumulative?: bigint | undefined;
+  }): void {
+    const currentCumulative = BigInt(this.state.cumulative);
+    const candidateCumulative = update.cumulative;
+    const shouldAdvanceCumulative =
+      candidateCumulative !== undefined && candidateCumulative > currentCumulative;
+    const shouldReplaceReceipt =
+      update.receipt !== undefined &&
+      (!this.state.lastReceipt || isReceiptNewer(update.receipt, this.state.lastReceipt));
+    const shouldAdoptContext =
+      !this.lastRequestUrl ||
+      shouldAdvanceCumulative ||
+      (candidateCumulative !== undefined &&
+        candidateCumulative === currentCumulative &&
+        update.closeContext !== undefined &&
+        this.closeContext === undefined);
+
+    if (update.channelId && (!this.state.channelId || shouldAdvanceCumulative || shouldReplaceReceipt)) {
+      this.state.channelId = update.channelId;
     }
 
-    this.lastChallenge = challenge;
-
-    const request = (challenge as { request?: unknown }).request;
-    if (!request || typeof request !== 'object') {
-      return;
+    if (candidateCumulative !== undefined) {
+      this.state.cumulative = maxNumericString(this.state.cumulative, candidateCumulative.toString());
     }
 
-    const methodDetails = (request as { methodDetails?: unknown }).methodDetails;
-    if (!methodDetails || typeof methodDetails !== 'object') {
-      return;
+    if (update.receipt) {
+      this.state.spent = maxNumericString(this.state.spent, update.receipt.spent);
+      if (shouldReplaceReceipt) {
+        this.state.lastReceipt = update.receipt;
+      }
     }
 
-    const chainId = (methodDetails as { chainId?: unknown }).chainId;
-    const escrowContract = (methodDetails as { escrowContract?: unknown }).escrowContract;
-    const feeToken = (request as { currency?: unknown }).currency;
-
-    if (typeof chainId !== 'number' || typeof escrowContract !== 'string') {
-      return;
+    if (shouldAdoptContext) {
+      this.lastRequestUrl = update.requestUrl;
+      this.lastRequestInit = update.requestInit;
+      if (update.challenge !== undefined) {
+        this.lastChallenge = update.challenge;
+      }
+      if (update.closeContext) {
+        this.closeContext = update.closeContext;
+      }
     }
-
-    this.closeContext = {
-      chainId,
-      escrowContract: escrowContract as `0x${string}`,
-      feeToken: typeof feeToken === 'string' ? feeToken as `0x${string}` : undefined
-    };
   }
 
   private async closeWithFallback(): Promise<TempoSessionReceipt | undefined> {
@@ -440,11 +454,87 @@ function coerceReceipt(receipt: unknown): TempoSessionReceipt | undefined {
 
 function resolveCloseCumulative(state: TempoSessionState): string {
   const acceptedCumulative = state.lastReceipt?.acceptedCumulative;
-  if (acceptedCumulative && BigInt(acceptedCumulative) > 0n) {
-    return acceptedCumulative;
+  if (acceptedCumulative) {
+    return maxNumericString(state.cumulative, acceptedCumulative);
   }
 
   return state.cumulative;
+}
+
+function resolveResponseCumulative(
+  response: Pick<TempoSessionResponse, 'cumulative'>,
+  receipt?: TempoSessionReceipt | undefined
+): bigint | undefined {
+  const values: bigint[] = [];
+
+  if (typeof response.cumulative === 'bigint') {
+    values.push(response.cumulative);
+  }
+
+  if (receipt) {
+    values.push(BigInt(receipt.acceptedCumulative));
+  }
+
+  return values.length > 0 ? values.reduce((max, value) => (value > max ? value : max)) : undefined;
+}
+
+function extractCloseContext(challenge: unknown): TempoCloseContext | undefined {
+  if (!challenge || typeof challenge !== 'object') {
+    return undefined;
+  }
+
+  const request = (challenge as { request?: unknown }).request;
+  if (!request || typeof request !== 'object') {
+    return undefined;
+  }
+
+  const methodDetails = (request as { methodDetails?: unknown }).methodDetails;
+  if (!methodDetails || typeof methodDetails !== 'object') {
+    return undefined;
+  }
+
+  const chainId = (methodDetails as { chainId?: unknown }).chainId;
+  const escrowContract = (methodDetails as { escrowContract?: unknown }).escrowContract;
+  const feeToken = (request as { currency?: unknown }).currency;
+
+  if (typeof chainId !== 'number' || typeof escrowContract !== 'string') {
+    return undefined;
+  }
+
+  return {
+    chainId,
+    escrowContract: escrowContract as `0x${string}`,
+    feeToken: typeof feeToken === 'string' ? feeToken as `0x${string}` : undefined
+  };
+}
+
+function isReceiptNewer(candidate: TempoSessionReceipt, current: TempoSessionReceipt): boolean {
+  const cumulativeComparison = compareNumericStrings(candidate.acceptedCumulative, current.acceptedCumulative);
+  if (cumulativeComparison !== 0) {
+    return cumulativeComparison > 0;
+  }
+
+  const spentComparison = compareNumericStrings(candidate.spent, current.spent);
+  if (spentComparison !== 0) {
+    return spentComparison > 0;
+  }
+
+  return Boolean(candidate.txHash && !current.txHash);
+}
+
+function maxNumericString(left: string, right: string): string {
+  return compareNumericStrings(left, right) >= 0 ? left : right;
+}
+
+function compareNumericStrings(left: string, right: string): number {
+  const leftValue = BigInt(left);
+  const rightValue = BigInt(right);
+
+  if (leftValue === rightValue) {
+    return 0;
+  }
+
+  return leftValue > rightValue ? 1 : -1;
 }
 
 function resolveRecoveryRequestKind(requestUrl: string): 'openai-chat-completions' | undefined {

@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
+import * as childProcess from 'node:child_process';
 import test from 'node:test';
 import {
   createTempoWallet,
+  createSystemSecretStore,
   formatWalletFundingMessage,
   normalizePrivateKey,
   resolveTempoPrivateKey,
@@ -73,4 +75,33 @@ test('formatWalletFundingMessage includes the wallet address', () => {
     formatWalletFundingMessage('0x5555555555555555555555555555555555555555'),
     /0x5555555555555555555555555555555555555555/
   );
+});
+
+test('createSystemSecretStore uses prompt mode on macOS so the secret is not passed via argv', () => {
+  const calls: Array<{
+    file: string;
+    args?: readonly string[] | undefined;
+    options?: unknown;
+  }> = [];
+  const store = createSystemSecretStore({
+    platform: () => 'darwin',
+    execFileSync: ((file, args, options) => {
+      calls.push({ file, args, options });
+      return Buffer.alloc(0);
+    }) as typeof childProcess.execFileSync
+  });
+
+  store.set('summ-tempo', 'default', 'super-secret');
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0]?.file, 'security');
+  assert.deepEqual(
+    calls[0]?.args,
+    ['add-generic-password', '-s', 'summ-tempo', '-a', 'default', '-U', '-w']
+  );
+  assert.equal(
+    (calls[0]?.options as { input?: string } | undefined)?.input,
+    'super-secret\nsuper-secret\n'
+  );
+  assert.equal(calls[0]?.args?.includes('super-secret'), false);
 });
