@@ -105,20 +105,7 @@ bun run bookfold ./book.pdf
 bun run bookfold:dev ./book.pdf
 ```
 
-## publishing
-
-the workspace root package is private and should not be published. publish the public packages from their workspace directories instead.
-
-release order:
-
-1. `bun publish --cwd packages/sdk --access public`
-2. `bun publish --cwd packages/cli --access public`
-
-`packages/cli` depends on `@bookfold/sdk` via `workspace:*`, so Bun rewrites that dependency to the current SDK version during publish. this keeps local development linked to the workspace while producing a registry-safe `bookfold` package.
-
-the workspace itself is Bun-first. use `bun install`, `bun run ...`, and `bun publish` in the repo. for local CLI linking, use `npm link --workspace bookfold` through `bun run link:bookfold`; `bun link` at the repo root registers the private workspace package instead of the public CLI.
-
-CLI behavior:
+## CLI behavior
 
 - passing a file path defaults to `summarize`
 - `summarize` also has a short alias: `sum`
@@ -128,7 +115,7 @@ CLI behavior:
 - progress, payment metadata, and file-write logs go to `stderr`
 - `recover` exits non-zero for failed entries and wallet mismatches
 
-detail modes:
+## detail modes
 
 - `short`: `gpt-4o-mini`, target `150-300` words, single-pass for very small books, otherwise light map-reduce
 - `medium`: `gpt-4o`, target `500-900` words, map-reduce
