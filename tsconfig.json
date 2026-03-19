@@ -1,0 +1,35 @@
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./packages/sdk"
+    },
+    {
+      "path": "./packages/cli"
+    }
+  ],
+  "compilerOptions": {
+    "baseUrl": ".",
+    "target": "ES2023",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": [
+      "ES2023",
+      "DOM"
+    ],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "declaration": true,
+    "sourceMap": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "paths": {
+      "@summ-tempo/sdk": [
+        "./packages/sdk/src/index.ts"
+      ]
+    }
+  }
+}

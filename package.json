@@ -1,0 +1,25 @@
+{
+  "name": "summ-tempo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22.6.0"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "rm -rf packages/sdk/dist packages/cli/dist",
+    "typecheck": "tsc -b --pretty false",
+    "test": "tsx --test packages/sdk/test/**/*.test.ts packages/cli/test/**/*.test.ts",
+    "verify": "npm run typecheck && npm run test"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "pdf-lib": "^1.17.1",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  }
+}

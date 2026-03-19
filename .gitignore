@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+
+# Build output
+packages/*/dist/
+*.tsbuildinfo
+coverage/
+.nyc_output/
+.cache/
+.turbo/
+.next/
+
+# Environment and local overrides
+.env
+.env.*
+!.env.example
+!.env.sample
+*.local
+.npmrc
+.yarnrc
+.yarnrc.yml
+
+# Keys, certificates, and secret material
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*.der
+*.ovpn
+*.kdbx
+
+# Local logs and databases
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.sqlite
+*.sqlite3
+*.db
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Local protocol docs
+docs/machine-payments-protocol.md

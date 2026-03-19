@@ -1,0 +1,20 @@
+{
+  "name": "@summ-tempo/sdk",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "fast-xml-parser": "^5.3.5",
+    "jszip": "^3.10.1",
+    "mppx": "^0.4.7",
+    "pdfjs-dist": "^5.4.394",
+    "viem": "^2.28.0"
+  }
+}
