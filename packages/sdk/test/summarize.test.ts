@@ -32,7 +32,7 @@ class MockProvider implements SummarizationProvider {
 
   getPaymentSummary(): SummaryPaymentResult {
     return {
-      provider: 'mock',
+      provider: 'openai-mpp',
       spent: '0',
       cumulative: '0',
       requestCount: this.calls.length

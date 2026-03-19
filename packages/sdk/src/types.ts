@@ -34,7 +34,7 @@ export interface SummaryMetadata {
 }
 
 export interface SummaryPaymentResult {
-  provider: 'openai-mpp' | 'mock';
+  provider: 'openai-mpp';
   baseUrl?: string | undefined;
   endpointPath?: string | undefined;
   maxDeposit?: string | undefined;
@@ -80,6 +80,5 @@ export interface SummarizeBookOptions {
   filePath: string;
   detail: DetailLevel;
   signal?: AbortSignal;
-  provider?: SummarizationProvider | undefined;
   onProgress?: ((event: ProgressEvent) => void) | undefined;
 }

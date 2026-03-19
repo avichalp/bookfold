@@ -15,7 +15,7 @@
     "lint": "eslint packages",
     "typecheck": "tsc -b --pretty false",
     "typecheck:unused": "tsc -p tsconfig.unused.json --pretty false",
-    "dead-code": "npm run typecheck:unused && knip",
+    "dead-code": "npm run typecheck:unused && knip --include exports,types,files --no-config-hints",
     "test": "tsx --test packages/sdk/test/**/*.test.ts packages/cli/test/**/*.test.ts",
     "verify": "npm run typecheck && npm run test"
   },

@@ -24,12 +24,9 @@ interface SecretStore {
   delete(serviceName: string, accountName: string): void;
 }
 
-export function resolveTempoWallet(options: {
-  envPrivateKey?: string | undefined;
-  store?: SecretStore | undefined;
-} = {}): TempoWalletInfo | undefined {
-  const store = options.store ?? createSystemSecretStore();
-  const envPrivateKey = normalizePrivateKey(options.envPrivateKey ?? process.env.TEMPO_PRIVATE_KEY, {
+export function resolveTempoWallet(): TempoWalletInfo | undefined {
+  const store = createSystemSecretStore();
+  const envPrivateKey = normalizePrivateKey(process.env.TEMPO_PRIVATE_KEY, {
     allowEmpty: true
   });
 
@@ -74,12 +71,9 @@ export function resolveTempoWallet(options: {
   return undefined;
 }
 
-export function resolveTempoPrivateKey(options: {
-  envPrivateKey?: string | undefined;
-  store?: SecretStore | undefined;
-} = {}): `0x${string}` | undefined {
-  const store = options.store ?? createSystemSecretStore();
-  const envPrivateKey = normalizePrivateKey(options.envPrivateKey ?? process.env.TEMPO_PRIVATE_KEY, {
+export function resolveTempoPrivateKey(): `0x${string}` | undefined {
+  const store = createSystemSecretStore();
+  const envPrivateKey = normalizePrivateKey(process.env.TEMPO_PRIVATE_KEY, {
     allowEmpty: true
   });
 
@@ -108,11 +102,9 @@ export function resolveTempoPrivateKey(options: {
 }
 
 export function createTempoWallet(options: {
-  store?: SecretStore | undefined;
   overwrite?: boolean | undefined;
-  privateKey?: string | undefined;
 } = {}): TempoWalletInfo {
-  const store = options.store ?? createSystemSecretStore();
+  const store = createSystemSecretStore();
   const existing = store.get(APP_SERVICE_NAME, APP_ACCOUNT_NAME);
   if (existing && !options.overwrite) {
     const privateKey = normalizePrivateKey(existing);
@@ -127,9 +119,7 @@ export function createTempoWallet(options: {
     };
   }
 
-  const privateKey = options.privateKey
-    ? normalizePrivateKey(options.privateKey)
-    : generatePrivateKey();
+  const privateKey = generatePrivateKey();
 
   if (!privateKey) {
     throw new Error('Missing Tempo private key.');
@@ -145,12 +135,9 @@ export function createTempoWallet(options: {
   };
 }
 
-function createSystemSecretStore(options: {
-  platform?: (() => NodeJS.Platform) | undefined;
-  execFileSync?: typeof childProcess.execFileSync | undefined;
-} = {}): SecretStore {
-  const platform = (options.platform ?? os.platform)();
-  const execFileSync = options.execFileSync ?? childProcess.execFileSync;
+function createSystemSecretStore(): SecretStore {
+  const platform = os.platform();
+  const execFileSync = childProcess.execFileSync;
 
   if (platform === 'darwin') {
     return {

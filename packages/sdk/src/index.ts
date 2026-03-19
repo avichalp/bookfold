@@ -47,7 +47,7 @@ export async function summarizeBook(options: SummarizeBookOptions): Promise<Summ
       }
     });
 
-    provider = options.provider ?? new OpenAiMppProvider();
+    provider = new OpenAiMppProvider();
 
     prepared = await summarizeParsedBook({
       book,

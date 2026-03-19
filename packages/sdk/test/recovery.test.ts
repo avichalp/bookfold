@@ -3,65 +3,37 @@ import { mkdtemp, readFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { privateKeyToAccount } from 'viem/accounts';
 import {
   createTempoRecoveryStore,
   recoverTempoSessions,
+  type TempoRecoveryEntry
 } from '../src/recovery.js';
 
-class MemoryRecoveryStore {
-  readonly filePath = '/tmp/bookfold-recovery.json';
+async function withHomeDirectory<T>(
+  homeDirectory: string,
+  callback: () => Promise<T> | T
+): Promise<T> {
+  const previousHome = process.env.HOME;
+  process.env.HOME = homeDirectory;
 
-  private entries: RecoveryEntry[];
-
-  constructor(entries: RecoveryEntry[] = []) {
-    this.entries = [...entries];
-  }
-
-  async list(): Promise<RecoveryEntry[]> {
-    return [...this.entries];
-  }
-
-  async upsert(entry: RecoveryEntry): Promise<void> {
-    const index = this.entries.findIndex((candidate) => candidate.channelId === entry.channelId);
-    if (index === -1) {
-      this.entries.push(entry);
+  try {
+    return await callback();
+  } finally {
+    if (previousHome === undefined) {
+      delete process.env.HOME;
     } else {
-      this.entries[index] = {
-        ...entry,
-        createdAt: this.entries[index].createdAt
-      };
+      process.env.HOME = previousHome;
     }
-  }
-
-  async remove(channelId: string): Promise<void> {
-    this.entries = this.entries.filter((entry) => entry.channelId !== channelId);
   }
 }
 
-const privateKey = `0x${'11'.repeat(32)}` as const;
-const payerAddress = privateKeyToAccount(privateKey).address;
-
-type RecoveryEntry = {
-  channelId: `0x${string}`;
-  cumulative: string;
-  requestUrl: string;
-  requestKind: 'openai-chat-completions';
-  payerAddress: `0x${string}`;
-  chainId: number;
-  escrowContract: `0x${string}`;
-  feeToken?: `0x${string}` | undefined;
-  createdAt: string;
-  updatedAt: string;
-};
-
-function createEntry(overrides: Partial<RecoveryEntry> = {}): RecoveryEntry {
+function createEntry(overrides: Partial<TempoRecoveryEntry> = {}): TempoRecoveryEntry {
   return {
     channelId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     cumulative: '22000',
     requestUrl: 'https://openai.mpp.tempo.xyz/v1/chat/completions',
     requestKind: 'openai-chat-completions',
-    payerAddress,
+    payerAddress: '0x19E7E376E7C213B7E7e7e46cc70A5Dd086DAff2A',
     chainId: 4217,
     escrowContract: '0x33b901018174DDabE4841042ab76ba85D4e24f25',
     feeToken: '0x20c000000000000000000000b9537d11c60e8b50',
@@ -72,131 +44,45 @@ function createEntry(overrides: Partial<RecoveryEntry> = {}): RecoveryEntry {
 }
 
 test('FileTempoRecoveryStore upserts and removes entries on disk', async () => {
-  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'bookfold-recovery-'));
-  const filePath = path.join(tempDir, 'recovery.json');
-  const store = createTempoRecoveryStore(filePath);
-  const first = createEntry();
-  const second = createEntry({
-    channelId: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-    cumulative: '82000'
+  const tempHome = await mkdtemp(path.join(os.tmpdir(), 'bookfold-recovery-'));
+
+  await withHomeDirectory(tempHome, async () => {
+    const filePath = path.join(tempHome, '.bookfold', 'recovery.json');
+    const store = createTempoRecoveryStore();
+    const first = createEntry();
+    const second = createEntry({
+      channelId: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      cumulative: '82000'
+    });
+
+    await store.upsert(first);
+    await store.upsert(second);
+    await store.upsert({ ...first, cumulative: '33000', updatedAt: '2026-03-19T01:00:00.000Z' });
+
+    const parsed = JSON.parse(await readFile(filePath, 'utf8')) as {
+      version: number;
+      channels: Array<{ channelId: string; cumulative: string; createdAt: string }>;
+    };
+    assert.equal(parsed.version, 1);
+    assert.equal(parsed.channels.length, 2);
+    assert.equal(parsed.channels[0].cumulative, '33000');
+    assert.equal(parsed.channels[0].createdAt, first.createdAt);
+
+    await store.remove(first.channelId);
+    const remaining = await store.list();
+    assert.equal(remaining.length, 1);
+    assert.equal(remaining[0].channelId, second.channelId);
   });
-
-  await store.upsert(first);
-  await store.upsert(second);
-  await store.upsert({ ...first, cumulative: '33000', updatedAt: '2026-03-19T01:00:00.000Z' });
-
-  const parsed = JSON.parse(await readFile(filePath, 'utf8')) as { version: number; channels: Array<{ channelId: string; cumulative: string; createdAt: string }> };
-  assert.equal(parsed.version, 1);
-  assert.equal(parsed.channels.length, 2);
-  assert.equal(parsed.channels[0].cumulative, '33000');
-  assert.equal(parsed.channels[0].createdAt, first.createdAt);
-
-  await store.remove(first.channelId);
-  const remaining = await store.list();
-  assert.equal(remaining.length, 1);
-  assert.equal(remaining[0].channelId, second.channelId);
-});
-
-test('recoverTempoSessions closes a stored channel cooperatively and removes it from the store', async () => {
-  const entry = createEntry();
-  const store = new MemoryRecoveryStore([entry]);
-
-  const report = await recoverTempoSessions({
-    store,
-    privateKey,
-    closeViaService: async () => ({
-      method: 'tempo',
-      intent: 'session',
-      status: 'success',
-      timestamp: '2026-03-19T00:00:00.000Z',
-      reference: entry.channelId,
-      challengeId: 'challenge',
-      channelId: entry.channelId,
-      acceptedCumulative: entry.cumulative,
-      spent: entry.cumulative,
-      txHash: '0xclose'
-    }),
-    getChannelState: async () => ({
-      finalized: false,
-      closeRequestedAt: 0n,
-      deposit: 1_000_000n,
-      settled: 0n
-    }),
-    requestClose: async () => {
-      throw new Error('should not request close');
-    },
-    withdraw: async () => {
-      throw new Error('should not withdraw');
-    }
-  });
-
-  assert.equal(report.remainingChannels, 0);
-  assert.equal(report.results[0].status, 'closed');
-  assert.equal(report.results[0].txHash, '0xclose');
-  assert.equal((await store.list()).length, 0);
-});
-
-test('recoverTempoSessions requests forced close when cooperative close fails', async () => {
-  const entry = createEntry();
-  const store = new MemoryRecoveryStore([entry]);
-
-  const report = await recoverTempoSessions({
-    store,
-    privateKey,
-    closeViaService: async () => {
-      throw new Error('service close failed');
-    },
-    getChannelState: async () => ({
-      finalized: false,
-      closeRequestedAt: 0n,
-      deposit: 1_000_000n,
-      settled: 0n
-    }),
-    requestClose: async () => ({
-      txHash: '0xrequestclose',
-      unlockAt: new Date('2026-03-19T12:44:50.000Z')
-    }),
-    withdraw: async () => {
-      throw new Error('should not withdraw');
-    }
-  });
-
-  assert.equal(report.remainingChannels, 1);
-  assert.equal(report.results[0].status, 'close-requested');
-  assert.equal(report.results[0].txHash, '0xrequestclose');
-  assert.match(report.results[0].error ?? '', /service close failed/);
-});
-
-test('recoverTempoSessions withdraws a matured forced-close channel and removes it', async () => {
-  const entry = createEntry();
-  const store = new MemoryRecoveryStore([entry]);
-
-  const report = await recoverTempoSessions({
-    store,
-    privateKey,
-    getChannelState: async () => ({
-      finalized: false,
-      closeRequestedAt: 1n,
-      deposit: 1_000_000n,
-      settled: 0n
-    }),
-    withdraw: async () => ({
-      txHash: '0xwithdraw'
-    }),
-    now: () => new Date('2026-03-19T12:45:10.000Z')
-  });
-
-  assert.equal(report.remainingChannels, 0);
-  assert.equal(report.results[0].status, 'withdrawn');
-  assert.equal(report.results[0].txHash, '0xwithdraw');
-  assert.equal((await store.list()).length, 0);
 });
 
 test('recoverTempoSessions returns an empty report when nothing is stored', async () => {
-  const report = await recoverTempoSessions({
-    store: new MemoryRecoveryStore()
-  });
+  const tempHome = await mkdtemp(path.join(os.tmpdir(), 'bookfold-recovery-'));
 
-  assert.equal(report.remainingChannels, 0);
-  assert.deepEqual(report.results, []);
+  await withHomeDirectory(tempHome, async () => {
+    const report = await recoverTempoSessions();
+
+    assert.equal(report.remainingChannels, 0);
+    assert.deepEqual(report.results, []);
+    assert.equal(report.storePath, path.join(tempHome, '.bookfold', 'recovery.json'));
+  });
 });

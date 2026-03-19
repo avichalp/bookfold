@@ -3,20 +3,18 @@
   "workspaces": {
     "packages/sdk": {
       "entry": [
-        "test/**/*.test.ts"
+        "src/index.ts"
       ],
       "project": [
-        "src/**/*.ts",
-        "test/**/*.ts"
+        "src/**/*.ts"
       ]
     },
     "packages/cli": {
       "entry": [
-        "test/**/*.test.ts"
+        "src/index.ts"
       ],
       "project": [
-        "src/**/*.ts",
-        "test/**/*.ts"
+        "src/**/*.ts"
       ]
     }
   }
