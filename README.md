@@ -31,15 +31,37 @@ wallet storage:
 
 ## install
 
-preferred local workflow with Bun:
+published package:
+
+```bash
+npm install -g bookfold
+bookfold --help
+```
+
+one-off runs without a global install:
+
+```bash
+bunx bookfold ./book.pdf
+npx bookfold ./book.pdf
+```
+
+local development from a source checkout:
 
 ```bash
 bun install
-bun run build
-bun link
+bun run link:bookfold
+bookfold --help
 ```
 
-for local development:
+local development without touching your global PATH:
+
+```bash
+bun install
+bun run bookfold:dev --help
+bun run bookfold:dev ./book.pdf
+```
+
+verification:
 
 ```bash
 bun run verify
@@ -66,7 +88,7 @@ if no wallet exists and the CLI is interactive, `bookfold` will offer to create 
 
 ## usage
 
-once the binary is linked or installed globally:
+once `bookfold` is installed globally or linked from this repo:
 
 ```bash
 bookfold ./book.pdf
@@ -76,33 +98,14 @@ bookfold ./book.pdf --json --output ./summary.json
 bookfold recover
 ```
 
-for a one-off run from the package registry after publish, use:
+from a source checkout, you can also use the packaged scripts:
 
 ```bash
-bunx bookfold ./book.pdf
-npx bookfold ./book.pdf
+bun run bookfold ./book.pdf
+bun run bookfold:dev ./book.pdf
 ```
 
-without building or linking from a source checkout:
-
-```bash
-npx tsx packages/cli/src/index.ts ./book.pdf
-```
-
-## publishing
-
-the workspace root package is private and should not be published. publish the public packages from their workspace directories instead.
-
-release order:
-
-1. `bun publish --cwd packages/sdk --access public`
-2. `bun publish --cwd packages/cli --access public`
-
-`packages/cli` depends on `@bookfold/sdk` via `workspace:*`, so Bun rewrites that dependency to the current SDK version during publish. this keeps local development linked to the workspace while producing a registry-safe `bookfold` package.
-
-the workspace itself is Bun-first. use `bun install`, `bun run ...`, and `bun publish` in the repo; `npx` remains supported only for the published `bookfold` package that end users install from the registry.
-
-CLI behavior:
+## CLI behavior
 
 - passing a file path defaults to `summarize`
 - `summarize` also has a short alias: `sum`
@@ -112,7 +115,7 @@ CLI behavior:
 - progress, payment metadata, and file-write logs go to `stderr`
 - `recover` exits non-zero for failed entries and wallet mismatches
 
-detail modes:
+## detail modes
 
 - `short`: `gpt-4o-mini`, target `150-300` words, single-pass for very small books, otherwise light map-reduce
 - `medium`: `gpt-4o`, target `500-900` words, map-reduce

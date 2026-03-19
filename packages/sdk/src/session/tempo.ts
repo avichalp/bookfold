@@ -6,7 +6,7 @@ import { tempo as tempoChain } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import { CLI_NAME, REQUEST_TIMEOUT_MS, TEMPO_MAX_DEPOSIT } from '../config.js';
 import type { TempoRecoveryEntry, TempoRecoveryStore } from '../recovery.js';
-import { resolveTempoPrivateKey } from '../wallet.js';
+import { formatWalletFundingMessage, resolveTempoPrivateKey } from '../wallet.js';
 
 export interface TempoSessionReceipt {
   method: 'tempo';
@@ -34,6 +34,8 @@ interface TempoSessionState {
 
 interface TempoSessionClientOptions {
   recoveryStore?: TempoRecoveryStore | undefined;
+  manager?: TempoSessionManager | undefined;
+  privateKey?: `0x${string}` | undefined;
 }
 
 interface TempoSessionResponse extends Response {
@@ -93,7 +95,7 @@ export class TempoSessionClient {
   };
 
   constructor(options: TempoSessionClientOptions = {}) {
-    const privateKey = resolveTempoPrivateKey();
+    const privateKey = options.privateKey ?? resolveTempoPrivateKey();
 
     if (!privateKey) {
       throw new Error(
@@ -106,7 +108,7 @@ export class TempoSessionClient {
     this.payerAddress = account.address;
     this.maxDeposit = TEMPO_MAX_DEPOSIT;
     this.recoveryStore = options.recoveryStore;
-    this.manager = mppxTempo.session({
+    this.manager = options.manager ?? mppxTempo.session({
       account,
       maxDeposit: this.maxDeposit
     });
@@ -165,7 +167,7 @@ export class TempoSessionClient {
 
       return undefined;
     } catch (error) {
-      const message = normalizeSessionError(error, 'Failed to close Tempo session');
+      const message = normalizeSessionError(error, 'Failed to close Tempo session', this.payerAddress);
       this.state.closeError = message;
       throw new Error(message);
     }
@@ -184,10 +186,13 @@ export class TempoSessionClient {
     if (!this.firstRequestBarrier) {
       let resolveBarrier: (() => void) | undefined;
       let rejectBarrier: ((reason?: unknown) => void) | undefined;
-      this.firstRequestBarrier = new Promise<void>((resolve, reject) => {
+      const barrier = new Promise<void>((resolve, reject) => {
         resolveBarrier = resolve;
         rejectBarrier = reject;
       });
+      // The leader request can fail before any follower awaits the barrier.
+      barrier.catch(() => {});
+      this.firstRequestBarrier = barrier;
 
       try {
         const result = await this.performFetchJson<T>(input, init, signal);
@@ -229,7 +234,7 @@ export class TempoSessionClient {
     try {
       response = await this.manager.fetch(input, { ...init, signal });
     } catch (error) {
-      throw new Error(normalizeSessionError(error));
+      throw new Error(normalizeSessionError(error, 'Tempo session request failed', this.payerAddress));
     }
 
     const receipt = coerceReceipt(response.receipt);
@@ -652,7 +657,43 @@ async function readErrorResponse(response: Response): Promise<string> {
   }
 }
 
-function normalizeSessionError(error: unknown, prefix = 'Tempo session request failed'): string {
+function normalizeSessionError(
+  error: unknown,
+  prefix = 'Tempo session request failed',
+  payerAddress?: `0x${string}`
+): string {
   const message = error instanceof Error ? error.message : String(error);
-  return `${prefix}: ${message}`;
+  const fundingMessage = formatFundingError(message, payerAddress);
+  return fundingMessage ? `${prefix}: ${fundingMessage}` : `${prefix}: ${message}`;
+}
+
+function formatFundingError(
+  message: string,
+  payerAddress?: `0x${string}`
+): string | undefined {
+  if (!/InsufficientBalance/i.test(message)) {
+    return undefined;
+  }
+
+  const lines = [
+    payerAddress
+      ? `Tempo wallet ${payerAddress} does not have enough fee-token balance for this request.`
+      : 'Tempo wallet does not have enough fee-token balance for this request.'
+  ];
+
+  if (payerAddress) {
+    lines.push(formatWalletFundingMessage(payerAddress));
+  }
+
+  const primaryReason = extractPrimaryErrorLine(message);
+  if (primaryReason) {
+    lines.push(`Upstream reason: ${primaryReason}`);
+  }
+
+  return lines.join('\n');
+}
+
+function extractPrimaryErrorLine(message: string): string {
+  const [firstParagraph] = message.trim().split(/\n\s*\n/u, 1);
+  return firstParagraph?.trim() ?? '';
 }

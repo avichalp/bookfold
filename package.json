@@ -15,9 +15,13 @@
   },
   "scripts": {
     "build": "tsc -b",
+    "bookfold": "bun run build && node packages/cli/dist/index.js",
+    "bookfold:dev": "tsx packages/cli/src/index.ts",
     "clean": "rm -rf packages/sdk/dist packages/cli/dist",
+    "link:bookfold": "bun run build && npm link --workspace bookfold",
     "lint": "eslint packages",
     "typecheck": "tsc -b --pretty false",
+    "unlink:bookfold": "npm unlink -g bookfold",
     "dead-code": "knip --include exports,types,files --no-config-hints",
     "test": "tsx --test packages/sdk/test/**/*.test.ts packages/cli/test/**/*.test.ts",
     "verify": "bun run typecheck && bun run test"
