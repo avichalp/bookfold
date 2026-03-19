@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import readline from 'node:readline';
+import { realpathSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import {
@@ -9,12 +10,29 @@ import {
   recoverTempoSessions,
   resolveTempoWallet,
   summarizeBook,
+  type RecoverTempoSessionsOptions,
   type TempoRecoveryProgressEvent,
   type TempoRecoveryReport,
   type TempoWalletInfo,
   type ProgressEvent,
+  type SummarizeBookOptions,
   type SummaryResult
 } from '@bookfold/sdk';
+
+interface Writer {
+  write(chunk: string): void;
+}
+
+interface CliDependencies {
+  summarize?: (options: SummarizeBookOptions) => Promise<SummaryResult>;
+  recover?: (options?: RecoverTempoSessionsOptions) => Promise<TempoRecoveryReport>;
+  resolveWallet?: () => TempoWalletInfo | undefined;
+  createWallet?: (options?: { overwrite?: boolean | undefined }) => TempoWalletInfo;
+  confirm?: (message: string, defaultYes?: boolean) => Promise<boolean>;
+  isInteractive?: () => boolean;
+  stdout?: Writer;
+  stderr?: Writer;
+}
 
 interface SummarizeArgs {
   command: 'summarize';
@@ -44,23 +62,31 @@ type ParsedCliArgs = SummarizeArgs | WalletInitArgs | WalletAddressArgs | Recove
 
 const CLI_NAME = 'bookfold';
 const USAGE = `Usage:
+  ${CLI_NAME} <file> [-d short|medium|long] [-j] [-o <path>] [-v]
   ${CLI_NAME} summarize <file> [--detail short|medium|long] [--json] [--output <path>] [--verbose]
-  ${CLI_NAME} recover [--json] [--verbose]
+  ${CLI_NAME} recover [-j] [-v]
   ${CLI_NAME} wallet init [--force]
   ${CLI_NAME} wallet address
 
 Examples:
-  ${CLI_NAME} summarize ./book.pdf
-  ${CLI_NAME} summarize ./book.epub --detail long
-  ${CLI_NAME} summarize ./book.pdf --json --output ./summary.json
+  ${CLI_NAME} ./book.pdf
+  ${CLI_NAME} ./book.epub -d long
+  ${CLI_NAME} sum ./book.pdf -j -o ./summary.json
   ${CLI_NAME} recover
   ${CLI_NAME} wallet init
   ${CLI_NAME} wallet address`;
 
-export async function runCli(argv: string[]): Promise<number> {
-  const stdout = process.stdout;
-  const stderr = process.stderr;
-  if (argv.includes('--help') || argv.includes('-h')) {
+export async function runCli(argv: string[], dependencies: CliDependencies = {}): Promise<number> {
+  const stdout = dependencies.stdout ?? process.stdout;
+  const stderr = dependencies.stderr ?? process.stderr;
+  const summarize = dependencies.summarize ?? summarizeBook;
+  const recover = dependencies.recover ?? recoverTempoSessions;
+  const resolveWallet = dependencies.resolveWallet ?? (() => resolveTempoWallet());
+  const createWallet = dependencies.createWallet ?? ((options) => createTempoWallet(options));
+  const confirm = dependencies.confirm ?? ((message, defaultYes) => confirmPrompt(message, defaultYes));
+  const isInteractive = dependencies.isInteractive ?? (() => Boolean(process.stdin.isTTY && process.stderr.isTTY));
+
+  if (argv.length === 0 || argv.includes('--help') || argv.includes('-h') || argv[0] === 'help') {
     stdout.write(`${USAGE}\n`);
     return 0;
   }
@@ -75,13 +101,13 @@ export async function runCli(argv: string[]): Promise<number> {
 
   if (parsed.command === 'wallet-init') {
     try {
-      const existing = resolveTempoWallet();
+      const existing = resolveWallet();
       if (existing && !parsed.force) {
         stdout.write(`${formatWalletInfo(existing)}\n`);
         return 0;
       }
 
-      const created = createTempoWallet({ overwrite: parsed.force });
+      const created = createWallet({ overwrite: parsed.force });
       stdout.write(`${formatWalletInfo(created)}\n`);
       stdout.write(`${formatWalletFundingMessage(created.address)}\n`);
       return 0;
@@ -92,7 +118,7 @@ export async function runCli(argv: string[]): Promise<number> {
   }
 
   if (parsed.command === 'wallet-address') {
-    const wallet = resolveTempoWallet();
+    const wallet = resolveWallet();
     if (!wallet) {
       stderr.write(`No Tempo wallet found. Run \`${CLI_NAME} wallet init\` or set TEMPO_PRIVATE_KEY.\n`);
       return 1;
@@ -110,7 +136,7 @@ export async function runCli(argv: string[]): Promise<number> {
     };
 
     try {
-      const report = await recoverTempoSessions({ onProgress: logProgress });
+      const report = await recover({ onProgress: logProgress });
       stdout.write(parsed.json ? `${JSON.stringify(report, null, 2)}\n` : formatRecoveryReport(report));
       return report.results.some(
         (result) => result.status === 'failed' || result.status === 'skipped-wallet-mismatch'
@@ -125,20 +151,17 @@ export async function runCli(argv: string[]): Promise<number> {
 
   const summarizeArgs = parsed;
 
-  if (!resolveTempoWallet()) {
-    if (process.stdin.isTTY && process.stderr.isTTY) {
+  if (!resolveWallet()) {
+    if (isInteractive()) {
       stderr.write('No Tempo wallet found.\n');
-      const shouldCreate = await confirmPrompt(
-        'Create a local Tempo wallet and store it in your system keychain?',
-        true
-      );
+      const shouldCreate = await confirm('Create a local Tempo wallet and store it in your system keychain?', true);
       if (!shouldCreate) {
         stderr.write(`Canceled. Run \`${CLI_NAME} wallet init\` when you are ready.\n`);
         return 1;
       }
 
       try {
-        const wallet = createTempoWallet();
+        const wallet = createWallet();
         stderr.write(`[wallet] Created ${wallet.address} (${wallet.source})\n`);
         stderr.write(`${formatWalletFundingMessage(wallet.address)}\n`);
       } catch (error) {
@@ -159,7 +182,7 @@ export async function runCli(argv: string[]): Promise<number> {
   };
 
   try {
-    const result = await summarizeBook({
+    const result = await summarize({
       filePath: summarizeArgs.filePath,
       detail: summarizeArgs.detail,
       onProgress: logProgress
@@ -196,19 +219,91 @@ export async function runCli(argv: string[]): Promise<number> {
 
 function parseArgs(argv: string[]): ParsedCliArgs {
   if (argv[0] === 'recover') {
-    let json = false;
-    let verbose = false;
+    return parseRecoverArgs(argv.slice(1));
+  }
 
-    for (let index = 1; index < argv.length; index += 1) {
-      const argument = argv[index];
+  if (argv[0] === 'wallet') {
+    return parseWalletArgs(argv.slice(1));
+  }
 
-      if (argument === '--json') {
-        json = true;
-        continue;
-      }
+  if (argv[0] === 'summarize' || argv[0] === 'sum') {
+    return parseSummarizeArgs(argv.slice(1));
+  }
 
-      if (argument === '--verbose') {
-        verbose = true;
+  if (findImplicitSummarizePath(argv)) {
+    return parseSummarizeArgs(argv);
+  }
+
+  throw new Error('Expected <file>, `summarize`, `sum`, `recover`, or `wallet`.');
+}
+
+function findImplicitSummarizePath(argv: string[]): string | undefined {
+  for (let index = 0; index < argv.length; index += 1) {
+    const argument = argv[index];
+    if (argument === undefined) {
+      continue;
+    }
+
+    const detailOption = readOptionValue(argv, index, argument, '--detail', '-d', '--detail');
+    if (detailOption) {
+      index = detailOption.nextIndex;
+      continue;
+    }
+
+    const outputOption = readOptionValue(argv, index, argument, '--output', '-o', '--output');
+    if (outputOption) {
+      index = outputOption.nextIndex;
+      continue;
+    }
+
+    if (argument === '--json' || argument === '-j' || argument === '--verbose' || argument === '-v') {
+      continue;
+    }
+
+    if (argument.startsWith('-')) {
+      return undefined;
+    }
+
+    return looksLikeBookPath(argument) ? argument : undefined;
+  }
+
+  return undefined;
+}
+
+function looksLikeBookPath(value: string): boolean {
+  const normalized = value.toLowerCase();
+  return normalized.endsWith('.pdf') || normalized.endsWith('.epub');
+}
+
+function parseRecoverArgs(argv: string[]): RecoverArgs {
+  let json = false;
+  let verbose = false;
+
+  for (const argument of argv) {
+    if (argument === '--json' || argument === '-j') {
+      json = true;
+      continue;
+    }
+
+    if (argument === '--verbose' || argument === '-v') {
+      verbose = true;
+      continue;
+    }
+
+    throw new Error(`Unknown argument: ${argument}`);
+  }
+
+  return {
+    command: 'recover',
+    json,
+    verbose
+  };
+}
+
+function parseWalletArgs(argv: string[]): WalletInitArgs | WalletAddressArgs {
+  if (argv[0] === 'init' || argv[0] === 'create') {
+    for (const argument of argv.slice(1)) {
+      if (argument === '--force' || argument === '-f') {
         continue;
       }
 
@@ -216,75 +311,72 @@ function parseArgs(argv: string[]): ParsedCliArgs {
     }
 
     return {
-      command: 'recover',
-      json,
-      verbose
+      command: 'wallet-init',
+      force: argv.includes('--force') || argv.includes('-f')
     };
   }
 
-  if (argv[0] === 'wallet') {
-    if (argv[1] === 'init') {
-      return {
-        command: 'wallet-init',
-        force: argv.includes('--force')
-      };
+  if (argv[0] === 'address' || argv[0] === 'addr') {
+    if (argv.length > 1) {
+      throw new Error(`Unknown argument: ${argv[1]}`);
     }
 
-    if (argv[1] === 'address') {
-      return { command: 'wallet-address' };
-    }
-
-    throw new Error('Expected `wallet init` or `wallet address`.');
+    return { command: 'wallet-address' };
   }
 
-  if (argv[0] !== 'summarize') {
-    throw new Error('Expected `summarize`, `recover`, or `wallet`.');
-  }
+  throw new Error('Expected `wallet init`, `wallet create`, `wallet address`, or `wallet addr`.');
+}
 
-  const filePath = argv[1];
-  if (!filePath || filePath.startsWith('-')) {
-    throw new Error('Missing <file> argument.');
-  }
-
+function parseSummarizeArgs(argv: string[]): SummarizeArgs {
+  let filePath: string | undefined;
   let detail: SummarizeArgs['detail'] = 'medium';
   let json = false;
   let verbose = false;
   let outputPath: string | undefined;
 
-  for (let index = 2; index < argv.length; index += 1) {
+  for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
-
-    if (argument === '--detail') {
-      const value = argv[index + 1];
-      if (value !== 'short' && value !== 'medium' && value !== 'long') {
-        throw new Error('`--detail` must be one of: short, medium, long.');
-      }
-      detail = value;
-      index += 1;
+    if (argument === undefined) {
       continue;
     }
 
-    if (argument === '--json') {
+    const detailOption = readOptionValue(argv, index, argument, '--detail', '-d', '--detail');
+    if (detailOption) {
+      detail = parseDetail(detailOption.value);
+      index = detailOption.nextIndex;
+      continue;
+    }
+
+    const outputOption = readOptionValue(argv, index, argument, '--output', '-o', '--output');
+    if (outputOption) {
+      outputPath = outputOption.value;
+      index = outputOption.nextIndex;
+      continue;
+    }
+
+    if (argument === '--json' || argument === '-j') {
       json = true;
       continue;
     }
 
-    if (argument === '--verbose') {
+    if (argument === '--verbose' || argument === '-v') {
       verbose = true;
       continue;
     }
 
-    if (argument === '--output') {
-      const value = argv[index + 1];
-      if (!value || value.startsWith('-')) {
-        throw new Error('`--output` requires a file path.');
-      }
-      outputPath = value;
-      index += 1;
-      continue;
+    if (argument.startsWith('-')) {
+      throw new Error(`Unknown argument: ${argument}`);
     }
 
-    throw new Error(`Unknown argument: ${argument}`);
+    if (filePath) {
+      throw new Error(`Unexpected argument: ${argument}`);
+    }
+
+    filePath = argument;
+  }
+
+  if (!filePath) {
+    throw new Error('Missing <file> argument.');
   }
 
   return {
@@ -295,6 +387,51 @@ function parseArgs(argv: string[]): ParsedCliArgs {
     outputPath,
     verbose
   };
+}
+
+function readOptionValue(
+  argv: string[],
+  index: number,
+  argument: string,
+  longFlag: string,
+  shortFlag: string,
+  label: string
+): { value: string; nextIndex: number } | undefined {
+  if (argument === longFlag || argument === shortFlag) {
+    const value = argv[index + 1];
+    if (!value || value.startsWith('-')) {
+      throw new Error(`\`${label}\` requires a value.`);
+    }
+
+    return {
+      value,
+      nextIndex: index + 1
+    };
+  }
+
+  if (argument.startsWith(`${longFlag}=`)) {
+    return {
+      value: argument.slice(longFlag.length + 1),
+      nextIndex: index
+    };
+  }
+
+  if (argument.startsWith(`${shortFlag}=`)) {
+    return {
+      value: argument.slice(shortFlag.length + 1),
+      nextIndex: index
+    };
+  }
+
+  return undefined;
+}
+
+function parseDetail(value: string): SummarizeArgs['detail'] {
+  if (value !== 'short' && value !== 'medium' && value !== 'long') {
+    throw new Error('`--detail` must be one of: short, medium, long.');
+  }
+
+  return value;
 }
 
 function formatWalletInfo(wallet: TempoWalletInfo): string {
@@ -382,6 +519,17 @@ async function main(): Promise<void> {
   process.exitCode = exitCode;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  void main();
+if (process.argv[1]) {
+  const entryPoint = process.argv[1];
+  let entryUrl = pathToFileURL(entryPoint).href;
+
+  try {
+    entryUrl = pathToFileURL(realpathSync(entryPoint)).href;
+  } catch {
+    // Fall back to the argv path when the real path cannot be resolved.
+  }
+
+  if (import.meta.url === entryUrl) {
+    void main();
+  }
 }
