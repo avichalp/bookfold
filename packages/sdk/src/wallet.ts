@@ -18,7 +18,7 @@ export interface TempoWalletInfo {
   serviceName: string;
 }
 
-export interface SecretStore {
+interface SecretStore {
   get(serviceName: string, accountName: string): string | undefined;
   set(serviceName: string, accountName: string, secret: string): void;
   delete(serviceName: string, accountName: string): void;
@@ -145,18 +145,7 @@ export function createTempoWallet(options: {
   };
 }
 
-export function deleteTempoWallet(store: SecretStore = createSystemSecretStore()): void {
-  store.delete(APP_SERVICE_NAME, APP_ACCOUNT_NAME);
-}
-
-export function hasTempoWallet(options: {
-  envPrivateKey?: string | undefined;
-  store?: SecretStore | undefined;
-} = {}): boolean {
-  return resolveTempoWallet(options) !== undefined;
-}
-
-export function createSystemSecretStore(options: {
+function createSystemSecretStore(options: {
   platform?: (() => NodeJS.Platform) | undefined;
   execFileSync?: typeof childProcess.execFileSync | undefined;
 } = {}): SecretStore {
@@ -237,7 +226,7 @@ export function createSystemSecretStore(options: {
   );
 }
 
-export function normalizePrivateKey(
+function normalizePrivateKey(
   value: string | undefined,
   options: { allowEmpty?: boolean | undefined } = {}
 ): `0x${string}` | undefined {

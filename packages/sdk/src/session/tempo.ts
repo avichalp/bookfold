@@ -22,7 +22,7 @@ export interface TempoSessionReceipt {
   txHash?: string | undefined;
 }
 
-export interface TempoSessionState {
+interface TempoSessionState {
   cumulative: string;
   spent: string;
   channelId?: string | undefined;
@@ -32,7 +32,7 @@ export interface TempoSessionState {
   requestCount: number;
 }
 
-export interface TempoSessionClientOptions {
+interface TempoSessionClientOptions {
   privateKey?: string | undefined;
   maxDeposit?: string | undefined;
   sessionManager?: TempoSessionManager | undefined;

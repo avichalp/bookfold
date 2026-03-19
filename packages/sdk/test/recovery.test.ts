@@ -5,26 +5,24 @@ import path from 'node:path';
 import test from 'node:test';
 import { privateKeyToAccount } from 'viem/accounts';
 import {
-  FileTempoRecoveryStore,
+  createTempoRecoveryStore,
   recoverTempoSessions,
-  type TempoRecoveryEntry,
-  type TempoRecoveryStore
 } from '../src/recovery.js';
 
-class MemoryRecoveryStore implements TempoRecoveryStore {
+class MemoryRecoveryStore {
   readonly filePath = '/tmp/bookfold-recovery.json';
 
-  private entries: TempoRecoveryEntry[];
+  private entries: RecoveryEntry[];
 
-  constructor(entries: TempoRecoveryEntry[] = []) {
+  constructor(entries: RecoveryEntry[] = []) {
     this.entries = [...entries];
   }
 
-  async list(): Promise<TempoRecoveryEntry[]> {
+  async list(): Promise<RecoveryEntry[]> {
     return [...this.entries];
   }
 
-  async upsert(entry: TempoRecoveryEntry): Promise<void> {
+  async upsert(entry: RecoveryEntry): Promise<void> {
     const index = this.entries.findIndex((candidate) => candidate.channelId === entry.channelId);
     if (index === -1) {
       this.entries.push(entry);
@@ -44,7 +42,20 @@ class MemoryRecoveryStore implements TempoRecoveryStore {
 const privateKey = `0x${'11'.repeat(32)}` as const;
 const payerAddress = privateKeyToAccount(privateKey).address;
 
-function createEntry(overrides: Partial<TempoRecoveryEntry> = {}): TempoRecoveryEntry {
+type RecoveryEntry = {
+  channelId: `0x${string}`;
+  cumulative: string;
+  requestUrl: string;
+  requestKind: 'openai-chat-completions';
+  payerAddress: `0x${string}`;
+  chainId: number;
+  escrowContract: `0x${string}`;
+  feeToken?: `0x${string}` | undefined;
+  createdAt: string;
+  updatedAt: string;
+};
+
+function createEntry(overrides: Partial<RecoveryEntry> = {}): RecoveryEntry {
   return {
     channelId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     cumulative: '22000',
@@ -63,7 +74,7 @@ function createEntry(overrides: Partial<TempoRecoveryEntry> = {}): TempoRecovery
 test('FileTempoRecoveryStore upserts and removes entries on disk', async () => {
   const tempDir = await mkdtemp(path.join(os.tmpdir(), 'bookfold-recovery-'));
   const filePath = path.join(tempDir, 'recovery.json');
-  const store = new FileTempoRecoveryStore(filePath);
+  const store = createTempoRecoveryStore(filePath);
   const first = createEntry();
   const second = createEntry({
     channelId: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',

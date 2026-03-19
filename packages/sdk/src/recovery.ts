@@ -19,7 +19,7 @@ const RECOVERY_FILE_VERSION = 1;
 const RECOVERY_FILE_NAME = 'recovery.json';
 const DEFAULT_CLOSE_REQUEST_GRACE_PERIOD_SECONDS = 900n;
 
-export type TempoRecoveryRequestKind = 'openai-chat-completions';
+type TempoRecoveryRequestKind = 'openai-chat-completions';
 
 export interface TempoRecoveryEntry {
   channelId: `0x${string}`;
@@ -47,7 +47,7 @@ export interface TempoRecoveryProgressEvent {
   detail?: Record<string, unknown> | undefined;
 }
 
-export type TempoRecoveryStatus =
+type TempoRecoveryStatus =
   | 'closed'
   | 'close-requested'
   | 'awaiting-withdraw'
@@ -56,7 +56,7 @@ export type TempoRecoveryStatus =
   | 'skipped-wallet-mismatch'
   | 'failed';
 
-export interface TempoRecoveryResult {
+interface TempoRecoveryResult {
   channelId: string;
   cumulative: string;
   requestUrl: string;
@@ -112,7 +112,7 @@ export interface RecoverTempoSessionsOptions {
   now?: (() => Date) | undefined;
 }
 
-export class FileTempoRecoveryStore implements TempoRecoveryStore {
+class FileTempoRecoveryStore implements TempoRecoveryStore {
   readonly filePath: string;
 
   constructor(filePath = getTempoRecoveryFilePath()) {
@@ -187,7 +187,7 @@ export function createTempoRecoveryStore(filePath?: string): TempoRecoveryStore 
   return new FileTempoRecoveryStore(filePath);
 }
 
-export function getTempoRecoveryFilePath(): string {
+function getTempoRecoveryFilePath(): string {
   return path.join(os.homedir(), `.${APP_NAME}`, RECOVERY_FILE_NAME);
 }
 

@@ -47,7 +47,7 @@ type SessionClient = {
   readonly depositLimit: string;
 };
 
-export interface OpenAiMppProviderOptions {
+interface OpenAiMppProviderOptions {
   baseUrl?: string | undefined;
   endpointPath?: string | undefined;
   tempoPrivateKey?: string | undefined;

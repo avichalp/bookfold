@@ -186,7 +186,6 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
     const result = await summarize({
       filePath: summarizeArgs.filePath,
       detail: summarizeArgs.detail,
-      outputFormat: summarizeArgs.json ? 'json' : 'text',
       onProgress: logProgress
     });
 

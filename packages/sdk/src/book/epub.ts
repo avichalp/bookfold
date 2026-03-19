@@ -315,7 +315,7 @@ async function extractTocFromNavAsync(
   return parseNavToc(navXhtml, spine, navItem.href);
 }
 
-export function parseNavToc(navXhtml: string, spine: SpineItem[], navHref: string): TocEntry[] {
+function parseNavToc(navXhtml: string, spine: SpineItem[], navHref: string): TocEntry[] {
   const navDir = path.dirname(navHref);
   let parsed: any;
 
@@ -559,7 +559,7 @@ async function extractTocFromNcx(
   return parseNcxToc(ncxXml, spine, ncxItem.href);
 }
 
-export function parseNcxToc(ncxXml: string, spine: SpineItem[], ncxHref: string): TocEntry[] {
+function parseNcxToc(ncxXml: string, spine: SpineItem[], ncxHref: string): TocEntry[] {
   const ncxDir = path.dirname(ncxHref);
   let parsed: any;
 
@@ -667,7 +667,7 @@ function filenameFallbackTitle(href: string): string {
   return basename.replace(/[-_]+/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase()).trim() || 'Untitled';
 }
 
-export function xhtmlToText(xhtml: string): string {
+function xhtmlToText(xhtml: string): string {
   let text = xhtml;
   text = text.replace(/<head[^>]*>[\s\S]*?<\/head>/gi, '');
   text = text.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
@@ -700,7 +700,7 @@ function decodeHtmlEntities(text: string): string {
     .replace(/&#x([0-9a-f]+);/gi, (_match, hex) => String.fromCharCode(Number.parseInt(hex, 16)));
 }
 
-export function mapHrefToSpineIndex(href: string, spine: SpineItem[]): number | null {
+function mapHrefToSpineIndex(href: string, spine: SpineItem[]): number | null {
   const [withoutFragment = ''] = href.split('#');
   const normalized = normalizePath(withoutFragment);
 
@@ -735,7 +735,7 @@ const FONT_OBFUSCATION_ALGORITHMS = new Set([
   'http://ns.adobe.com/pdf/enc#RC'
 ]);
 
-export async function hasDrmEncryption(zip: JSZip, reader?: GuardedReader): Promise<boolean> {
+async function hasDrmEncryption(zip: JSZip, reader?: GuardedReader): Promise<boolean> {
   const encryptionFile = zip.file('META-INF/encryption.xml');
   if (!encryptionFile) {
     return false;
@@ -831,7 +831,7 @@ function extractEncryptionAlgorithm(encryptedData: unknown): string | null {
   return null;
 }
 
-export function looksLikeEpub(buffer: Buffer): boolean {
+function looksLikeEpub(buffer: Buffer): boolean {
   return (
     buffer.length >= 4 &&
     buffer[0] === 0x50 &&
@@ -841,7 +841,7 @@ export function looksLikeEpub(buffer: Buffer): boolean {
   );
 }
 
-export async function validateEpubStructure(buffer: Buffer): Promise<{ valid: boolean; error?: string }> {
+async function validateEpubStructure(buffer: Buffer): Promise<{ valid: boolean; error?: string }> {
   if (!looksLikeEpub(buffer)) {
     return { valid: false, error: 'File is not a ZIP archive.' };
   }

@@ -1,7 +1,6 @@
 import type { DetailLevel } from './types.js';
 
 export const APP_NAME = 'bookfold';
-export const APP_DISPLAY_NAME = 'Bookfold';
 export const CLI_NAME = 'bookfold';
 export const OPENAI_MPP_BASE_URL = 'https://openai.mpp.tempo.xyz';
 export const OPENAI_MPP_CHAT_COMPLETIONS_PATH = '/v1/chat/completions';
@@ -15,7 +14,7 @@ export const CHUNK_MAX_TOKENS = 1000;
 export const CHUNK_OVERLAP_TOKENS = 100;
 export const PROMPT_VERSION = 'bookfold-v1';
 
-export interface DetailProfile {
+interface DetailProfile {
   model: string;
   targetWords: {
     min: number;

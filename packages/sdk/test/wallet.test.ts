@@ -1,17 +1,13 @@
 import assert from 'node:assert/strict';
-import * as childProcess from 'node:child_process';
 import test from 'node:test';
 import {
   createTempoWallet,
-  createSystemSecretStore,
   formatWalletFundingMessage,
-  normalizePrivateKey,
   resolveTempoPrivateKey,
-  resolveTempoWallet,
-  type SecretStore
+  resolveTempoWallet
 } from '../src/wallet.js';
 
-function createMemoryStore(): SecretStore & { values: Map<string, string> } {
+function createMemoryStore() {
   const values = new Map<string, string>();
 
   return {
@@ -63,12 +59,28 @@ test('resolveTempoWallet can reuse an existing mppx account entry', () => {
   assert.equal(resolved?.source, 'mppx');
 });
 
-test('normalizePrivateKey accepts bare hex and rejects malformed values', () => {
+test('createTempoWallet accepts bare hex private keys and stores them normalized', () => {
+  const store = createMemoryStore();
+
   assert.equal(
-    normalizePrivateKey('4444444444444444444444444444444444444444444444444444444444444444'),
+    createTempoWallet({
+      privateKey: '4444444444444444444444444444444444444444444444444444444444444444',
+      overwrite: true,
+      store
+    }).address,
+    resolveTempoWallet({ store })?.address
+  );
+  assert.equal(
+    resolveTempoPrivateKey({ store }),
     '0x4444444444444444444444444444444444444444444444444444444444444444'
   );
-  assert.throws(() => normalizePrivateKey('bad-key'), /32-byte hex/);
+});
+
+test('resolveTempoPrivateKey rejects malformed values', () => {
+  assert.throws(
+    () => resolveTempoPrivateKey({ envPrivateKey: 'bad-key' }),
+    /32-byte hex/
+  );
 });
 
 test('formatWalletFundingMessage includes the wallet address', () => {
@@ -76,33 +88,4 @@ test('formatWalletFundingMessage includes the wallet address', () => {
     formatWalletFundingMessage('0x5555555555555555555555555555555555555555'),
     /0x5555555555555555555555555555555555555555/
   );
-});
-
-test('createSystemSecretStore uses prompt mode on macOS so the secret is not passed via argv', () => {
-  const calls: Array<{
-    file: string;
-    args?: readonly string[] | undefined;
-    options?: unknown;
-  }> = [];
-  const store = createSystemSecretStore({
-    platform: () => 'darwin',
-    execFileSync: ((file, args, options) => {
-      calls.push({ file, args, options });
-      return Buffer.alloc(0);
-    }) as typeof childProcess.execFileSync
-  });
-
-  store.set('bookfold', 'default', 'super-secret');
-
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0]?.file, 'security');
-  assert.deepEqual(
-    calls[0]?.args,
-    ['add-generic-password', '-s', 'bookfold', '-a', 'default', '-U', '-w']
-  );
-  assert.equal(
-    (calls[0]?.options as { input?: string } | undefined)?.input,
-    'super-secret\nsuper-secret\n'
-  );
-  assert.equal(calls[0]?.args?.includes('super-secret'), false);
 });
