@@ -9,29 +9,12 @@ import {
   recoverTempoSessions,
   resolveTempoWallet,
   summarizeBook,
-  type RecoverTempoSessionsOptions,
   type TempoRecoveryProgressEvent,
   type TempoRecoveryReport,
   type TempoWalletInfo,
   type ProgressEvent,
-  type SummaryResult,
-  type SummarizeBookOptions
+  type SummaryResult
 } from '@bookfold/sdk';
-
-interface Writer {
-  write(chunk: string): void;
-}
-
-interface CliDependencies {
-  summarize?: (options: SummarizeBookOptions) => Promise<SummaryResult>;
-  recover?: (options?: RecoverTempoSessionsOptions) => Promise<TempoRecoveryReport>;
-  resolveWallet?: () => TempoWalletInfo | undefined;
-  createWallet?: (options?: { overwrite?: boolean | undefined }) => TempoWalletInfo;
-  confirm?: (message: string, defaultYes?: boolean) => Promise<boolean>;
-  isInteractive?: () => boolean;
-  stdout?: Writer;
-  stderr?: Writer;
-}
 
 interface SummarizeArgs {
   command: 'summarize';
@@ -74,16 +57,9 @@ Examples:
   ${CLI_NAME} wallet init
   ${CLI_NAME} wallet address`;
 
-export async function runCli(argv: string[], dependencies: CliDependencies = {}): Promise<number> {
-  const stdout = dependencies.stdout ?? process.stdout;
-  const stderr = dependencies.stderr ?? process.stderr;
-  const summarize = dependencies.summarize ?? summarizeBook;
-  const recover = dependencies.recover ?? recoverTempoSessions;
-  const resolveWallet = dependencies.resolveWallet ?? (() => resolveTempoWallet());
-  const createWallet = dependencies.createWallet ?? ((options) => createTempoWallet(options));
-  const confirm = dependencies.confirm ?? ((message, defaultYes) => confirmPrompt(message, defaultYes));
-  const isInteractive = dependencies.isInteractive ?? (() => Boolean(process.stdin.isTTY && process.stderr.isTTY));
-
+export async function runCli(argv: string[]): Promise<number> {
+  const stdout = process.stdout;
+  const stderr = process.stderr;
   if (argv.includes('--help') || argv.includes('-h')) {
     stdout.write(`${USAGE}\n`);
     return 0;
@@ -99,13 +75,13 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
 
   if (parsed.command === 'wallet-init') {
     try {
-      const existing = resolveWallet();
+      const existing = resolveTempoWallet();
       if (existing && !parsed.force) {
         stdout.write(`${formatWalletInfo(existing)}\n`);
         return 0;
       }
 
-      const created = createWallet({ overwrite: parsed.force });
+      const created = createTempoWallet({ overwrite: parsed.force });
       stdout.write(`${formatWalletInfo(created)}\n`);
       stdout.write(`${formatWalletFundingMessage(created.address)}\n`);
       return 0;
@@ -116,7 +92,7 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
   }
 
   if (parsed.command === 'wallet-address') {
-    const wallet = resolveWallet();
+    const wallet = resolveTempoWallet();
     if (!wallet) {
       stderr.write(`No Tempo wallet found. Run \`${CLI_NAME} wallet init\` or set TEMPO_PRIVATE_KEY.\n`);
       return 1;
@@ -134,7 +110,7 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
     };
 
     try {
-      const report = await recover({ onProgress: logProgress });
+      const report = await recoverTempoSessions({ onProgress: logProgress });
       stdout.write(parsed.json ? `${JSON.stringify(report, null, 2)}\n` : formatRecoveryReport(report));
       return report.results.some(
         (result) => result.status === 'failed' || result.status === 'skipped-wallet-mismatch'
@@ -149,10 +125,10 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
 
   const summarizeArgs = parsed;
 
-  if (!resolveWallet()) {
-    if (isInteractive()) {
+  if (!resolveTempoWallet()) {
+    if (process.stdin.isTTY && process.stderr.isTTY) {
       stderr.write('No Tempo wallet found.\n');
-      const shouldCreate = await confirm(
+      const shouldCreate = await confirmPrompt(
         'Create a local Tempo wallet and store it in your system keychain?',
         true
       );
@@ -162,7 +138,7 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
       }
 
       try {
-        const wallet = createWallet();
+        const wallet = createTempoWallet();
         stderr.write(`[wallet] Created ${wallet.address} (${wallet.source})\n`);
         stderr.write(`${formatWalletFundingMessage(wallet.address)}\n`);
       } catch (error) {
@@ -183,10 +159,9 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
   };
 
   try {
-    const result = await summarize({
+    const result = await summarizeBook({
       filePath: summarizeArgs.filePath,
       detail: summarizeArgs.detail,
-      outputFormat: summarizeArgs.json ? 'json' : 'text',
       onProgress: logProgress
     });
 

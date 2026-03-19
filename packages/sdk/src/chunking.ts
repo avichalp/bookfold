@@ -7,12 +7,12 @@ import {
 const MAX_CHUNK_CHARS = CHUNK_MAX_TOKENS * CHARS_PER_TOKEN_ESTIMATE;
 const OVERLAP_CHARS = CHUNK_OVERLAP_TOKENS * CHARS_PER_TOKEN_ESTIMATE;
 
-export interface TextWithPage {
+interface TextWithPage {
   text: string;
   pageNumber: number;
 }
 
-export interface ChunkResult {
+interface ChunkResult {
   content: string;
   pageNumbers: number[];
   tokenCount: number;

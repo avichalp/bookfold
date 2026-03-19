@@ -1,10 +1,9 @@
 import {
   OPENAI_MPP_BASE_URL,
-  OPENAI_MPP_CHAT_COMPLETIONS_PATH,
-  TEMPO_MAX_DEPOSIT
+  OPENAI_MPP_CHAT_COMPLETIONS_PATH
 } from '../config.js';
 import { createTempoRecoveryStore } from '../recovery.js';
-import { TempoSessionClient, type TempoSessionReceipt } from '../session/tempo.js';
+import { TempoSessionClient } from '../session/tempo.js';
 import type {
   GenerateTextRequest,
   GenerateTextResult,
@@ -27,51 +26,19 @@ interface OpenAiChatCompletionResponse {
   }>;
 }
 
-type SessionClient = {
-  fetchJson<T>(input: RequestInfo | URL, init?: RequestInit): Promise<{
-    data: T;
-    receipt?: TempoSessionReceipt | undefined;
-    cumulative: string;
-    channelId?: string | undefined;
-  }>;
-  close(): Promise<TempoSessionReceipt | undefined>;
-  readonly paymentState: {
-    spent: string;
-    cumulative: string;
-    channelId?: string | undefined;
-    lastReceipt?: TempoSessionReceipt | undefined;
-    finalReceipt?: TempoSessionReceipt | undefined;
-    closeError?: string | undefined;
-    requestCount: number;
-  };
-  readonly depositLimit: string;
-};
-
-export interface OpenAiMppProviderOptions {
-  baseUrl?: string | undefined;
-  endpointPath?: string | undefined;
-  tempoPrivateKey?: string | undefined;
-  maxDeposit?: string | undefined;
-  sessionClient?: SessionClient | undefined;
-}
-
 export class OpenAiMppProvider implements SummarizationProvider {
   private readonly baseUrl: string;
 
   private readonly endpointPath: string;
 
-  private readonly session: SessionClient;
+  private readonly session: TempoSessionClient;
 
-  constructor(options: OpenAiMppProviderOptions = {}) {
-    this.baseUrl = options.baseUrl ?? OPENAI_MPP_BASE_URL;
-    this.endpointPath = options.endpointPath ?? OPENAI_MPP_CHAT_COMPLETIONS_PATH;
-    this.session =
-      options.sessionClient ??
-      new TempoSessionClient({
-        privateKey: options.tempoPrivateKey,
-        maxDeposit: options.maxDeposit ?? TEMPO_MAX_DEPOSIT,
-        recoveryStore: createTempoRecoveryStore()
-      });
+  constructor() {
+    this.baseUrl = OPENAI_MPP_BASE_URL;
+    this.endpointPath = OPENAI_MPP_CHAT_COMPLETIONS_PATH;
+    this.session = new TempoSessionClient({
+      recoveryStore: createTempoRecoveryStore()
+    });
   }
 
   async generateText(request: GenerateTextRequest): Promise<GenerateTextResult> {

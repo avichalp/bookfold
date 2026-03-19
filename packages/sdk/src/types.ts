@@ -1,7 +1,5 @@
 export type DetailLevel = 'short' | 'medium' | 'long';
 
-export type OutputFormat = 'text' | 'json';
-
 export type BookFileType = 'pdf' | 'epub';
 
 export interface ProviderMessage {
@@ -36,7 +34,7 @@ export interface SummaryMetadata {
 }
 
 export interface SummaryPaymentResult {
-  provider: 'openai-mpp' | 'mock';
+  provider: 'openai-mpp';
   baseUrl?: string | undefined;
   endpointPath?: string | undefined;
   maxDeposit?: string | undefined;
@@ -81,8 +79,6 @@ export interface SummarizationProvider {
 export interface SummarizeBookOptions {
   filePath: string;
   detail: DetailLevel;
-  outputFormat?: OutputFormat;
   signal?: AbortSignal;
-  provider?: SummarizationProvider | undefined;
   onProgress?: ((event: ProgressEvent) => void) | undefined;
 }

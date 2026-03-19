@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { parseEpub, validateEpubStructure } from '../src/book/epub.js';
+import { parseEpub } from '../src/book/epub.js';
 import {
   createEpubFixture,
   createEpubFixtureWithMalformedNcx,
@@ -19,10 +19,11 @@ test('parseEpub extracts chapters, metadata, and TOC from a small fixture EPUB',
   assert.match(book.chunks[0].content, /first chapter of the fixture EPUB/i);
 });
 
-test('validateEpubStructure reports malformed EPUBs clearly', async () => {
-  const result = await validateEpubStructure(await createMalformedEpubFixture());
-  assert.equal(result.valid, false);
-  assert.match(result.error ?? '', /META-INF\/container\.xml/);
+test('parseEpub reports malformed EPUBs clearly', async () => {
+  await assert.rejects(
+    async () => parseEpub('/tmp/malformed.epub', await createMalformedEpubFixture()),
+    /META-INF\/container\.xml/
+  );
 });
 
 test('parseEpub falls back to spine headings when the NCX is malformed', async () => {

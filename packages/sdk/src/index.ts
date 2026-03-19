@@ -3,36 +3,23 @@ import { OpenAiMppProvider } from './provider/openai-mpp.js';
 import { summarizeParsedBook } from './summarize/index.js';
 import type { SummarizeBookOptions, SummaryResult, SummarizationProvider } from './types.js';
 
-export { OpenAiMppProvider } from './provider/openai-mpp.js';
-export { parseBookFromFile } from './book/index.js';
-export { parseEpub, validateEpubStructure } from './book/epub.js';
-export { parsePdf } from './book/pdf.js';
-export {
-  createTempoRecoveryStore,
-  FileTempoRecoveryStore,
-  getTempoRecoveryFilePath,
-  recoverTempoSessions
-} from './recovery.js';
-export { summarizeParsedBook } from './summarize/index.js';
 export {
   createTempoWallet,
-  deleteTempoWallet,
   formatWalletFundingMessage,
-  hasTempoWallet,
-  resolveTempoPrivateKey,
   resolveTempoWallet
 } from './wallet.js';
-export type { TempoWalletInfo, TempoWalletSource } from './wallet.js';
+export { recoverTempoSessions } from './recovery.js';
 export type {
   RecoverTempoSessionsOptions,
-  TempoRecoveryEntry,
   TempoRecoveryProgressEvent,
-  TempoRecoveryReport,
-  TempoRecoveryResult,
-  TempoRecoveryStatus,
-  TempoRecoveryStore
+  TempoRecoveryReport
 } from './recovery.js';
-export type * from './types.js';
+export type {
+  ProgressEvent,
+  SummarizeBookOptions,
+  SummaryResult
+} from './types.js';
+export type { TempoWalletInfo } from './wallet.js';
 
 export async function summarizeBook(options: SummarizeBookOptions): Promise<SummaryResult> {
   let provider: SummarizationProvider | undefined;
@@ -60,7 +47,7 @@ export async function summarizeBook(options: SummarizeBookOptions): Promise<Summ
       }
     });
 
-    provider = options.provider ?? new OpenAiMppProvider();
+    provider = new OpenAiMppProvider();
 
     prepared = await summarizeParsedBook({
       book,

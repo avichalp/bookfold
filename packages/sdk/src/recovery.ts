@@ -19,7 +19,7 @@ const RECOVERY_FILE_VERSION = 1;
 const RECOVERY_FILE_NAME = 'recovery.json';
 const DEFAULT_CLOSE_REQUEST_GRACE_PERIOD_SECONDS = 900n;
 
-export type TempoRecoveryRequestKind = 'openai-chat-completions';
+type TempoRecoveryRequestKind = 'openai-chat-completions';
 
 export interface TempoRecoveryEntry {
   channelId: `0x${string}`;
@@ -47,7 +47,7 @@ export interface TempoRecoveryProgressEvent {
   detail?: Record<string, unknown> | undefined;
 }
 
-export type TempoRecoveryStatus =
+type TempoRecoveryStatus =
   | 'closed'
   | 'close-requested'
   | 'awaiting-withdraw'
@@ -56,7 +56,7 @@ export type TempoRecoveryStatus =
   | 'skipped-wallet-mismatch'
   | 'failed';
 
-export interface TempoRecoveryResult {
+interface TempoRecoveryResult {
   channelId: string;
   cumulative: string;
   requestUrl: string;
@@ -95,28 +95,15 @@ interface TempoRecoveryWithdrawResult {
 }
 
 export interface RecoverTempoSessionsOptions {
-  store?: TempoRecoveryStore | undefined;
-  privateKey?: string | undefined;
   signal?: AbortSignal | undefined;
   onProgress?: ((event: TempoRecoveryProgressEvent) => void) | undefined;
-  closeViaService?: (input: TempoCloseChannelFallbackInput) => Promise<TempoSessionReceipt>;
-  getChannelState?: (entry: TempoRecoveryEntry) => Promise<TempoRecoveryChannelState>;
-  requestClose?: (
-    entry: TempoRecoveryEntry,
-    privateKey: `0x${string}`
-  ) => Promise<TempoRecoveryRequestCloseResult>;
-  withdraw?: (
-    entry: TempoRecoveryEntry,
-    privateKey: `0x${string}`
-  ) => Promise<TempoRecoveryWithdrawResult>;
-  now?: (() => Date) | undefined;
 }
 
-export class FileTempoRecoveryStore implements TempoRecoveryStore {
+class FileTempoRecoveryStore implements TempoRecoveryStore {
   readonly filePath: string;
 
-  constructor(filePath = getTempoRecoveryFilePath()) {
-    this.filePath = filePath;
+  constructor() {
+    this.filePath = getTempoRecoveryFilePath();
   }
 
   async list(): Promise<TempoRecoveryEntry[]> {
@@ -183,18 +170,18 @@ export class FileTempoRecoveryStore implements TempoRecoveryStore {
   }
 }
 
-export function createTempoRecoveryStore(filePath?: string): TempoRecoveryStore {
-  return new FileTempoRecoveryStore(filePath);
+export function createTempoRecoveryStore(): TempoRecoveryStore {
+  return new FileTempoRecoveryStore();
 }
 
-export function getTempoRecoveryFilePath(): string {
+function getTempoRecoveryFilePath(): string {
   return path.join(os.homedir(), `.${APP_NAME}`, RECOVERY_FILE_NAME);
 }
 
 export async function recoverTempoSessions(
   options: RecoverTempoSessionsOptions = {}
 ): Promise<TempoRecoveryReport> {
-  const store = options.store ?? createTempoRecoveryStore();
+  const store = createTempoRecoveryStore();
   const entries = await store.list();
 
   if (entries.length === 0) {
@@ -205,18 +192,13 @@ export async function recoverTempoSessions(
     };
   }
 
-  const privateKey = resolveTempoPrivateKey({ envPrivateKey: options.privateKey });
+  const privateKey = resolveTempoPrivateKey();
   if (!privateKey) {
     throw new Error(
       `No Tempo wallet found. Run \`${CLI_NAME} wallet init\` or set TEMPO_PRIVATE_KEY before recovery.`
     );
   }
 
-  const closeViaService = options.closeViaService ?? recoverViaServiceClose;
-  const getChannelState = options.getChannelState ?? readRecoveryChannelState;
-  const requestClose = options.requestClose ?? requestCloseForRecovery;
-  const withdraw = options.withdraw ?? withdrawRecoveryChannel;
-  const now = options.now ?? (() => new Date());
   const account = privateKeyToAccount(privateKey);
   const results: TempoRecoveryResult[] = [];
 
@@ -243,11 +225,6 @@ export async function recoverTempoSessions(
     const result = await recoverEntry(entry, {
       store,
       privateKey,
-      closeViaService,
-      getChannelState,
-      requestClose,
-      withdraw,
-      now,
       onProgress: options.onProgress
     });
     results.push(result);
@@ -265,21 +242,10 @@ async function recoverEntry(
   options: {
     store: TempoRecoveryStore;
     privateKey: `0x${string}`;
-    closeViaService: (input: TempoCloseChannelFallbackInput) => Promise<TempoSessionReceipt>;
-    getChannelState: (entry: TempoRecoveryEntry) => Promise<TempoRecoveryChannelState>;
-    requestClose: (
-      entry: TempoRecoveryEntry,
-      privateKey: `0x${string}`
-    ) => Promise<TempoRecoveryRequestCloseResult>;
-    withdraw: (
-      entry: TempoRecoveryEntry,
-      privateKey: `0x${string}`
-    ) => Promise<TempoRecoveryWithdrawResult>;
-    now: () => Date;
     onProgress?: ((event: TempoRecoveryProgressEvent) => void) | undefined;
   }
 ): Promise<TempoRecoveryResult> {
-  let channel = await options.getChannelState(entry);
+  let channel = await readRecoveryChannelState(entry);
   if (channel.finalized || channel.deposit === 0n) {
     await options.store.remove(entry.channelId);
     return {
@@ -298,7 +264,7 @@ async function recoverEntry(
     });
 
     try {
-      const receipt = await options.closeViaService({
+      const receipt = await recoverViaServiceClose({
         ...(await buildRecoveryCloseInput(entry)),
         privateKey: options.privateKey
       });
@@ -314,7 +280,7 @@ async function recoverEntry(
     } catch (error) {
       const details = error instanceof Error ? error.message : String(error);
 
-      channel = await options.getChannelState(entry);
+      channel = await readRecoveryChannelState(entry);
       if (channel.finalized || channel.deposit === 0n) {
         await options.store.remove(entry.channelId);
         return {
@@ -333,7 +299,7 @@ async function recoverEntry(
         });
 
         try {
-          const requested = await options.requestClose(entry, options.privateKey);
+          const requested = await requestCloseForRecovery(entry, options.privateKey);
           return {
             channelId: entry.channelId,
             cumulative: entry.cumulative,
@@ -358,8 +324,8 @@ async function recoverEntry(
     }
   }
 
-  const unlockAt = await getUnlockAt(entry, channel.closeRequestedAt, options.now);
-  if (unlockAt.getTime() > options.now().getTime()) {
+  const unlockAt = await getUnlockAt(entry, channel.closeRequestedAt);
+  if (unlockAt.getTime() > Date.now()) {
     return {
       channelId: entry.channelId,
       cumulative: entry.cumulative,
@@ -376,7 +342,7 @@ async function recoverEntry(
   });
 
   try {
-    const withdrawn = await options.withdraw(entry, options.privateKey);
+    const withdrawn = await withdrawRecoveryChannel(entry, options.privateKey);
     await options.store.remove(entry.channelId);
     return {
       channelId: entry.channelId,
@@ -517,11 +483,10 @@ async function withdrawRecoveryChannel(
 
 async function getUnlockAt(
   entry: TempoRecoveryEntry,
-  closeRequestedAt: bigint,
-  now: () => Date
+  closeRequestedAt: bigint
 ): Promise<Date> {
   if (closeRequestedAt === 0n) {
-    return now();
+    return new Date();
   }
 
   const client = createPublicClient({

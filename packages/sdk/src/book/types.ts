@@ -7,7 +7,7 @@ export interface BookChunk {
   };
 }
 
-export interface BookMetadataInfo {
+interface BookMetadataInfo {
   title?: string | undefined;
   author?: string | undefined;
 }

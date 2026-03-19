@@ -22,7 +22,7 @@ export interface TempoSessionReceipt {
   txHash?: string | undefined;
 }
 
-export interface TempoSessionState {
+interface TempoSessionState {
   cumulative: string;
   spent: string;
   channelId?: string | undefined;
@@ -32,11 +32,7 @@ export interface TempoSessionState {
   requestCount: number;
 }
 
-export interface TempoSessionClientOptions {
-  privateKey?: string | undefined;
-  maxDeposit?: string | undefined;
-  sessionManager?: TempoSessionManager | undefined;
-  closeChannelFallback?: TempoCloseChannelFallback | undefined;
+interface TempoSessionClientOptions {
   recoveryStore?: TempoRecoveryStore | undefined;
 }
 
@@ -69,10 +65,6 @@ export interface TempoCloseChannelFallbackInput {
   requestInit?: RequestInit | undefined;
 }
 
-type TempoCloseChannelFallback = (
-  input: TempoCloseChannelFallbackInput
-) => Promise<TempoSessionReceipt>;
-
 export class TempoSessionClient {
   private readonly manager: TempoSessionManager;
 
@@ -81,8 +73,6 @@ export class TempoSessionClient {
   private readonly privateKey: `0x${string}`;
 
   private readonly payerAddress: `0x${string}`;
-
-  private readonly closeChannelFallback: TempoCloseChannelFallback;
 
   private readonly recoveryStore?: TempoRecoveryStore | undefined;
 
@@ -103,7 +93,7 @@ export class TempoSessionClient {
   };
 
   constructor(options: TempoSessionClientOptions = {}) {
-    const privateKey = resolveTempoPrivateKey({ envPrivateKey: options.privateKey });
+    const privateKey = resolveTempoPrivateKey();
 
     if (!privateKey) {
       throw new Error(
@@ -114,15 +104,12 @@ export class TempoSessionClient {
     const account = privateKeyToAccount(privateKey);
     this.privateKey = privateKey;
     this.payerAddress = account.address;
-    this.maxDeposit = options.maxDeposit ?? TEMPO_MAX_DEPOSIT;
-    this.closeChannelFallback = options.closeChannelFallback ?? closeTempoChannelViaService;
+    this.maxDeposit = TEMPO_MAX_DEPOSIT;
     this.recoveryStore = options.recoveryStore;
-    this.manager =
-      options.sessionManager ??
-      mppxTempo.session({
-        account,
-        maxDeposit: this.maxDeposit
-      });
+    this.manager = mppxTempo.session({
+      account,
+      maxDeposit: this.maxDeposit
+    });
   }
 
   get paymentState(): TempoSessionState {
@@ -347,7 +334,7 @@ export class TempoSessionClient {
     }
 
     try {
-      return await this.closeChannelFallback({
+      return await closeTempoChannelViaService({
         channelId: this.state.channelId as `0x${string}`,
         cumulative: resolveCloseCumulative(this.state),
         privateKey: this.privateKey,

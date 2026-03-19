@@ -12,14 +12,21 @@
   "scripts": {
     "build": "tsc -b",
     "clean": "rm -rf packages/sdk/dist packages/cli/dist",
+    "lint": "eslint packages",
     "typecheck": "tsc -b --pretty false",
+    "typecheck:unused": "tsc -p tsconfig.unused.json --pretty false",
+    "dead-code": "npm run typecheck:unused && knip --include exports,types,files --no-config-hints",
     "test": "tsx --test packages/sdk/test/**/*.test.ts packages/cli/test/**/*.test.ts",
     "verify": "npm run typecheck && npm run test"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^22.13.10",
+    "eslint": "^10.0.3",
+    "knip": "^5.88.1",
     "pdf-lib": "^1.17.1",
     "tsx": "^4.19.3",
-    "typescript": "^5.8.2"
+    "typescript": "^5.8.2",
+    "typescript-eslint": "^8.57.1"
   }
 }

@@ -29,7 +29,7 @@ export async function parseBookFromFile(filePath: string): Promise<ParsedBook> {
   }
 }
 
-export function detectBookFileType(filePath: string): BookFileType {
+function detectBookFileType(filePath: string): BookFileType {
   const extension = path.extname(filePath).toLowerCase();
 
   if (extension === '.pdf') {
