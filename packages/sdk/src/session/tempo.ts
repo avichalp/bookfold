@@ -34,6 +34,8 @@ interface TempoSessionState {
 
 interface TempoSessionClientOptions {
   recoveryStore?: TempoRecoveryStore | undefined;
+  manager?: TempoSessionManager | undefined;
+  privateKey?: `0x${string}` | undefined;
 }
 
 interface TempoSessionResponse extends Response {
@@ -93,7 +95,7 @@ export class TempoSessionClient {
   };
 
   constructor(options: TempoSessionClientOptions = {}) {
-    const privateKey = resolveTempoPrivateKey();
+    const privateKey = options.privateKey ?? resolveTempoPrivateKey();
 
     if (!privateKey) {
       throw new Error(
@@ -106,7 +108,7 @@ export class TempoSessionClient {
     this.payerAddress = account.address;
     this.maxDeposit = TEMPO_MAX_DEPOSIT;
     this.recoveryStore = options.recoveryStore;
-    this.manager = mppxTempo.session({
+    this.manager = options.manager ?? mppxTempo.session({
       account,
       maxDeposit: this.maxDeposit
     });
@@ -184,10 +186,13 @@ export class TempoSessionClient {
     if (!this.firstRequestBarrier) {
       let resolveBarrier: (() => void) | undefined;
       let rejectBarrier: ((reason?: unknown) => void) | undefined;
-      this.firstRequestBarrier = new Promise<void>((resolve, reject) => {
+      const barrier = new Promise<void>((resolve, reject) => {
         resolveBarrier = resolve;
         rejectBarrier = reject;
       });
+      // The leader request can fail before any follower awaits the barrier.
+      barrier.catch(() => {});
+      this.firstRequestBarrier = barrier;
 
       try {
         const result = await this.performFetchJson<T>(input, init, signal);
@@ -652,7 +657,7 @@ async function readErrorResponse(response: Response): Promise<string> {
   }
 }
 
-export function normalizeSessionError(
+function normalizeSessionError(
   error: unknown,
   prefix = 'Tempo session request failed',
   payerAddress?: `0x${string}`
