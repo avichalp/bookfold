@@ -74,6 +74,7 @@ initialize a wallet:
 ```bash
 bookfold wallet init
 bookfold wallet address
+bookfold wallet balance
 ```
 
 fund the printed address on Tempo Mainnet (chain id `4217`) with a USD-denominated Tempo fee token.
@@ -96,6 +97,7 @@ bookfold ./book.epub -d long
 bookfold ./book.pdf --json
 bookfold ./book.pdf --json --output ./summary.json
 bookfold recover
+bookfold wallet balance
 ```
 
 from a source checkout, you can also use the packaged scripts:
@@ -114,6 +116,7 @@ bun run bookfold:dev ./book.pdf
 - summary text or JSON goes to `stdout`
 - progress, payment metadata, and file-write logs go to `stderr`
 - `recover` exits non-zero for failed entries and wallet mismatches
+- `wallet balance` shows the active Tempo wallet, the effective fee token balance, the `pathUSD` fallback balance, and `USDC`
 
 ## detail modes
 
@@ -142,7 +145,7 @@ the SDK requires `detail`. the result includes:
 
 other exported helpers:
 
-- wallet: `createTempoWallet`, `resolveTempoWallet`, `formatWalletFundingMessage`
+- wallet: `createTempoWallet`, `resolveTempoWallet`, `formatWalletFundingMessage`, `getTempoWalletBalance`
 - recovery: `recoverTempoSessions`
 
 `summarizeBook` always attempts to close the provider in a `finally` block. if summarization succeeds but session close fails, the result is still returned and the close failure is attached to `payment.closeError` and `warnings`.

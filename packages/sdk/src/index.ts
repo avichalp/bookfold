@@ -8,6 +8,7 @@ export {
   formatWalletFundingMessage,
   resolveTempoWallet
 } from './wallet.js';
+export { getTempoWalletBalance } from './wallet-balance.js';
 export { recoverTempoSessions } from './recovery.js';
 export type {
   RecoverTempoSessionsOptions,
@@ -20,6 +21,11 @@ export type {
   SummaryResult
 } from './types.js';
 export type { TempoWalletInfo } from './wallet.js';
+export type {
+  TempoWalletAssetBalance,
+  TempoWalletBalanceReport,
+  TempoWalletTokenBalance
+} from './wallet-balance.js';
 
 export async function summarizeBook(options: SummarizeBookOptions): Promise<SummaryResult> {
   let provider: SummarizationProvider | undefined;
