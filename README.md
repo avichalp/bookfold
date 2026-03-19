@@ -31,15 +31,18 @@ wallet storage:
 
 ## install
 
+preferred local workflow with Bun:
+
 ```bash
-npm install
-npm run build
+bun install
+bun run build
+bun link
 ```
 
 for local development:
 
 ```bash
-npm run verify
+bun run verify
 ```
 
 ## setup
@@ -47,8 +50,8 @@ npm run verify
 initialize a wallet:
 
 ```bash
-node packages/cli/dist/index.js wallet init
-node packages/cli/dist/index.js wallet address
+bookfold wallet init
+bookfold wallet address
 ```
 
 fund the printed address on Tempo Mainnet (chain id `4217`) with a USD-denominated Tempo fee token.
@@ -63,24 +66,47 @@ if no wallet exists and the CLI is interactive, `bookfold` will offer to create 
 
 ## usage
 
-from the repo root:
+once the binary is linked or installed globally:
 
 ```bash
-node packages/cli/dist/index.js summarize ./book.pdf
-node packages/cli/dist/index.js summarize ./book.epub --detail long
-node packages/cli/dist/index.js summarize ./book.pdf --json
-node packages/cli/dist/index.js summarize ./book.pdf --json --output ./summary.json
-node packages/cli/dist/index.js recover
+bookfold ./book.pdf
+bookfold ./book.epub -d long
+bookfold ./book.pdf --json
+bookfold ./book.pdf --json --output ./summary.json
+bookfold recover
 ```
 
-without building:
+for a one-off run from the package registry after publish, use:
 
 ```bash
-npx tsx packages/cli/src/index.ts summarize ./book.pdf
+bunx bookfold ./book.pdf
+npx bookfold ./book.pdf
 ```
+
+without building or linking from a source checkout:
+
+```bash
+npx tsx packages/cli/src/index.ts ./book.pdf
+```
+
+## publishing
+
+the workspace root package is private and should not be published. publish the public packages from their workspace directories instead.
+
+release order:
+
+1. `bun publish --cwd packages/sdk --access public`
+2. `bun publish --cwd packages/cli --access public`
+
+`packages/cli` depends on `@bookfold/sdk` via `workspace:*`, so Bun rewrites that dependency to the current SDK version during publish. this keeps local development linked to the workspace while producing a registry-safe `bookfold` package.
+
+the workspace itself is Bun-first. use `bun install`, `bun run ...`, and `bun publish` in the repo; `npx` remains supported only for the published `bookfold` package that end users install from the registry.
 
 CLI behavior:
 
+- passing a file path defaults to `summarize`
+- `summarize` also has a short alias: `sum`
+- short flags are available: `-d`, `-j`, `-o`, `-v`
 - `summarize` defaults to `--detail medium`
 - summary text or JSON goes to `stdout`
 - progress, payment metadata, and file-write logs go to `stderr`

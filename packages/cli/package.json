@@ -1,5 +1,5 @@
 {
-  "name": "@bookfold/cli",
+  "name": "bookfold",
   "version": "0.1.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -8,6 +8,6 @@
     "bookfold": "./dist/index.js"
   },
   "dependencies": {
-    "@bookfold/sdk": "file:../sdk"
+    "@bookfold/sdk": "workspace:*"
   }
 }
