@@ -8,7 +8,7 @@ import { MAX_FILE_BYTES } from '../src/config.js';
 import { createMalformedEpubFixture } from './helpers.js';
 
 test('parseBookFromFile rejects unsupported file types', async () => {
-  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'summ-tempo-book-'));
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'bookfold-book-'));
   const filePath = path.join(tempDir, 'notes.txt');
   await writeFile(filePath, 'plain text');
 
@@ -19,7 +19,7 @@ test('parseBookFromFile rejects unsupported file types', async () => {
 });
 
 test('parseBookFromFile rejects oversized files before parsing', async () => {
-  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'summ-tempo-book-'));
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'bookfold-book-'));
   const filePath = path.join(tempDir, 'large.pdf');
   await writeFile(filePath, '');
   await truncate(filePath, MAX_FILE_BYTES + 1);
@@ -31,7 +31,7 @@ test('parseBookFromFile rejects oversized files before parsing', async () => {
 });
 
 test('parseBookFromFile surfaces malformed EPUB errors', async () => {
-  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'summ-tempo-book-'));
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'bookfold-book-'));
   const filePath = path.join(tempDir, 'broken.epub');
   await writeFile(filePath, await createMalformedEpubFixture());
 
@@ -42,7 +42,7 @@ test('parseBookFromFile surfaces malformed EPUB errors', async () => {
 });
 
 test('parseBookFromFile surfaces broken PDF errors', async () => {
-  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'summ-tempo-book-'));
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'bookfold-book-'));
   const filePath = path.join(tempDir, 'broken.pdf');
   await writeFile(filePath, 'not really a pdf');
 

@@ -4,7 +4,7 @@ import { PDFDocument, StandardFonts } from 'pdf-lib';
 export async function createPdfFixture(): Promise<Buffer> {
   const document = await PDFDocument.create();
   document.setTitle('Fixture Book');
-  document.setAuthor('Summ Tempo');
+  document.setAuthor('Bookfold');
 
   const font = await document.embedFont(StandardFonts.Helvetica);
   const pageOne = document.addPage([612, 792]);
@@ -47,7 +47,7 @@ export async function createEpubFixture(): Promise<Buffer> {
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="BookId">
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
     <dc:title>Fixture EPUB</dc:title>
-    <dc:creator>Summ Tempo</dc:creator>
+    <dc:creator>Bookfold</dc:creator>
     <dc:language>en</dc:language>
   </metadata>
   <manifest>
@@ -123,7 +123,7 @@ export async function createEpubFixtureWithMalformedNcx(): Promise<Buffer> {
 <package xmlns="http://www.idpf.org/2007/opf" version="2.0" unique-identifier="BookId">
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
     <dc:title>Fixture EPUB With Broken NCX</dc:title>
-    <dc:creator>Summ Tempo</dc:creator>
+    <dc:creator>Bookfold</dc:creator>
     <dc:language>en</dc:language>
   </metadata>
   <manifest>

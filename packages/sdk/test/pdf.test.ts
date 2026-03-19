@@ -8,7 +8,7 @@ test('parsePdf extracts text and metadata from a small fixture PDF', async () =>
 
   assert.equal(book.fileType, 'pdf');
   assert.equal(book.metadata.info.title, 'Fixture Book');
-  assert.equal(book.metadata.info.author, 'Summ Tempo');
+  assert.equal(book.metadata.info.author, 'Bookfold');
   assert.equal(book.metadata.pageCount, 2);
   assert.ok(book.chunks.length >= 1);
   assert.match(book.chunks[0].content, /first page of the fixture book/i);

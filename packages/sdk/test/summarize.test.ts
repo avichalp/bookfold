@@ -59,7 +59,7 @@ function createBook(chunkCount: number, withSections = false): ParsedBook {
     metadata: {
       info: {
         title: 'Fake Book',
-        author: 'Summ Tempo'
+        author: 'Bookfold'
       },
       pageCount: chunkCount,
       outlineEntries: withSections

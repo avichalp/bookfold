@@ -12,7 +12,7 @@ test('parseEpub extracts chapters, metadata, and TOC from a small fixture EPUB',
 
   assert.equal(book.fileType, 'epub');
   assert.equal(book.metadata.info.title, 'Fixture EPUB');
-  assert.equal(book.metadata.info.author, 'Summ Tempo');
+  assert.equal(book.metadata.info.author, 'Bookfold');
   assert.equal(book.metadata.chapterCount, 2);
   assert.equal(book.metadata.tocEntries?.length, 2);
   assert.ok(book.chunks.length >= 1);

@@ -6,7 +6,7 @@ import { Session as TempoProtocol } from 'mppx/tempo';
 import { createPublicClient, createWalletClient, http, isAddressEqual } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { tempo as tempoChain } from 'viem/chains';
-import { APP_NAME, OPENAI_MPP_CHAT_COMPLETIONS_PATH } from './config.js';
+import { APP_NAME, CLI_NAME, OPENAI_MPP_CHAT_COMPLETIONS_PATH } from './config.js';
 import {
   closeTempoChannelViaService,
   type TempoCloseContext,
@@ -208,7 +208,7 @@ export async function recoverTempoSessions(
   const privateKey = resolveTempoPrivateKey({ envPrivateKey: options.privateKey });
   if (!privateKey) {
     throw new Error(
-      'No Tempo wallet found. Run `summ-tempo wallet init` or set TEMPO_PRIVATE_KEY before recovery.'
+      `No Tempo wallet found. Run \`${CLI_NAME} wallet init\` or set TEMPO_PRIVATE_KEY before recovery.`
     );
   }
 

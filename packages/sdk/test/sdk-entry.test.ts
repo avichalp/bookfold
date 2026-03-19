@@ -35,7 +35,7 @@ class ClosingFailureProvider implements SummarizationProvider {
 }
 
 test('summarizeBook keeps the summary result and reports session close failure', async () => {
-  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'summ-tempo-sdk-'));
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'bookfold-sdk-'));
   const filePath = path.join(tempDir, 'fixture.pdf');
   await writeFile(filePath, await createPdfFixture());
 
@@ -51,7 +51,7 @@ test('summarizeBook keeps the summary result and reports session close failure',
 });
 
 test('summarizeBook surfaces local file errors before requiring TEMPO_PRIVATE_KEY', async () => {
-  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'summ-tempo-sdk-'));
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'bookfold-sdk-'));
   const filePath = path.join(tempDir, 'notes.txt');
   await writeFile(filePath, 'plain text');
 

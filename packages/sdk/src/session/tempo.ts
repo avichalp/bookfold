@@ -4,7 +4,7 @@ import { Session as TempoProtocol } from 'mppx/tempo';
 import { createWalletClient, http } from 'viem';
 import { tempo as tempoChain } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
-import { REQUEST_TIMEOUT_MS, TEMPO_MAX_DEPOSIT } from '../config.js';
+import { CLI_NAME, REQUEST_TIMEOUT_MS, TEMPO_MAX_DEPOSIT } from '../config.js';
 import type { TempoRecoveryEntry, TempoRecoveryStore } from '../recovery.js';
 import { resolveTempoPrivateKey } from '../wallet.js';
 
@@ -107,7 +107,7 @@ export class TempoSessionClient {
 
     if (!privateKey) {
       throw new Error(
-        'No Tempo wallet found. Run `summ-tempo wallet init` or set TEMPO_PRIVATE_KEY.'
+        `No Tempo wallet found. Run \`${CLI_NAME} wallet init\` or set TEMPO_PRIVATE_KEY.`
       );
     }
 
@@ -342,7 +342,7 @@ export class TempoSessionClient {
     if (!this.closeContext || !this.lastChallenge || !this.lastRequestUrl) {
       this.state.closeError =
         `Tempo session close returned no final receipt for channel ${this.state.channelId}. ` +
-        'Funds may remain locked until you run `summ-tempo recover`.';
+        `Funds may remain locked until you run \`${CLI_NAME} recover\`.`;
       return undefined;
     }
 

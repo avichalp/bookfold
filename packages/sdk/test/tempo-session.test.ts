@@ -186,7 +186,7 @@ test('marks close without a final receipt as a recovery warning', async () => {
   assert.equal(receipt, undefined);
   assert.match(
     client.paymentState.closeError ?? '',
-    /close returned no final receipt.*run `summ-tempo recover`/i
+    /close returned no final receipt.*run `bookfold recover`/i
   );
 });
 

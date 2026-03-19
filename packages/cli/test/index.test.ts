@@ -21,7 +21,7 @@ function createSummaryResult(): SummaryResult {
     metadata: {
       fileType: 'pdf',
       title: 'Fixture Book',
-      author: 'Summ Tempo',
+      author: 'Bookfold',
       pageCount: 2
     },
     payment: {
@@ -47,9 +47,9 @@ test('CLI writes summary to stdout and progress to stderr', async () => {
     stderr,
     resolveWallet: () => ({
       address: '0x1111111111111111111111111111111111111111',
-      source: 'summ-tempo',
+      source: 'app',
       accountName: 'default',
-      serviceName: 'summ-tempo'
+      serviceName: 'bookfold'
     }),
     summarize: async (options: SummarizeBookOptions) => {
       options.onProgress?.({ step: 'parse', message: 'parsed fixture', detail: { chunkCount: 2 } });
@@ -72,9 +72,9 @@ test('CLI emits structured JSON on stdout with --json', async () => {
     stderr,
     resolveWallet: () => ({
       address: '0x1111111111111111111111111111111111111111',
-      source: 'summ-tempo',
+      source: 'app',
       accountName: 'default',
-      serviceName: 'summ-tempo'
+      serviceName: 'bookfold'
     }),
     summarize: async () => createSummaryResult()
   });
@@ -89,7 +89,7 @@ test('CLI emits structured JSON on stdout with --json', async () => {
 test('CLI writes output to a file when --output is provided', async () => {
   const stdout = new MemoryWriter();
   const stderr = new MemoryWriter();
-  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'summ-tempo-cli-'));
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'bookfold-cli-'));
   const outputPath = path.join(tempDir, 'summary.txt');
 
   const exitCode = await runCli(['summarize', '/tmp/book.pdf', '--output', outputPath], {
@@ -97,9 +97,9 @@ test('CLI writes output to a file when --output is provided', async () => {
     stderr,
     resolveWallet: () => ({
       address: '0x1111111111111111111111111111111111111111',
-      source: 'summ-tempo',
+      source: 'app',
       accountName: 'default',
-      serviceName: 'summ-tempo'
+      serviceName: 'bookfold'
     }),
     summarize: async () => createSummaryResult()
   });
@@ -121,9 +121,9 @@ test('CLI can initialize a wallet on first summarize run', async () => {
     resolveWallet: () => undefined,
     createWallet: () => ({
       address: '0x2222222222222222222222222222222222222222',
-      source: 'summ-tempo',
+      source: 'app',
       accountName: 'default',
-      serviceName: 'summ-tempo'
+      serviceName: 'bookfold'
     }),
     isInteractive: () => true,
     confirm: async () => true,
@@ -145,9 +145,9 @@ test('CLI wallet init prints wallet details', async () => {
     resolveWallet: () => undefined,
     createWallet: () => ({
       address: '0x3333333333333333333333333333333333333333',
-      source: 'summ-tempo',
+      source: 'app',
       accountName: 'default',
-      serviceName: 'summ-tempo'
+      serviceName: 'bookfold'
     })
   });
 

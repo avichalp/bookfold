@@ -16,7 +16,7 @@ import {
   type ProgressEvent,
   type SummaryResult,
   type SummarizeBookOptions
-} from '@summ-tempo/sdk';
+} from '@bookfold/sdk';
 
 interface Writer {
   write(chunk: string): void;
@@ -59,19 +59,20 @@ interface RecoverArgs {
 
 type ParsedCliArgs = SummarizeArgs | WalletInitArgs | WalletAddressArgs | RecoverArgs;
 
+const CLI_NAME = 'bookfold';
 const USAGE = `Usage:
-  summ-tempo summarize <file> [--detail short|medium|long] [--json] [--output <path>] [--verbose]
-  summ-tempo recover [--json] [--verbose]
-  summ-tempo wallet init [--force]
-  summ-tempo wallet address
+  ${CLI_NAME} summarize <file> [--detail short|medium|long] [--json] [--output <path>] [--verbose]
+  ${CLI_NAME} recover [--json] [--verbose]
+  ${CLI_NAME} wallet init [--force]
+  ${CLI_NAME} wallet address
 
 Examples:
-  summ-tempo summarize ./book.pdf
-  summ-tempo summarize ./book.epub --detail long
-  summ-tempo summarize ./book.pdf --json --output ./summary.json
-  summ-tempo recover
-  summ-tempo wallet init
-  summ-tempo wallet address`;
+  ${CLI_NAME} summarize ./book.pdf
+  ${CLI_NAME} summarize ./book.epub --detail long
+  ${CLI_NAME} summarize ./book.pdf --json --output ./summary.json
+  ${CLI_NAME} recover
+  ${CLI_NAME} wallet init
+  ${CLI_NAME} wallet address`;
 
 export async function runCli(argv: string[], dependencies: CliDependencies = {}): Promise<number> {
   const stdout = dependencies.stdout ?? process.stdout;
@@ -117,7 +118,7 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
   if (parsed.command === 'wallet-address') {
     const wallet = resolveWallet();
     if (!wallet) {
-      stderr.write('No Tempo wallet found. Run `summ-tempo wallet init` or set TEMPO_PRIVATE_KEY.\n');
+      stderr.write(`No Tempo wallet found. Run \`${CLI_NAME} wallet init\` or set TEMPO_PRIVATE_KEY.\n`);
       return 1;
     }
     stdout.write(`${formatWalletInfo(wallet)}\n`);
@@ -156,7 +157,7 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
         true
       );
       if (!shouldCreate) {
-        stderr.write('Canceled. Run `summ-tempo wallet init` when you are ready.\n');
+        stderr.write(`Canceled. Run \`${CLI_NAME} wallet init\` when you are ready.\n`);
         return 1;
       }
 
@@ -169,7 +170,7 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
         return 1;
       }
     } else {
-      stderr.write('No Tempo wallet found. Run `summ-tempo wallet init` or set TEMPO_PRIVATE_KEY.\n');
+      stderr.write(`No Tempo wallet found. Run \`${CLI_NAME} wallet init\` or set TEMPO_PRIVATE_KEY.\n`);
       return 1;
     }
   }

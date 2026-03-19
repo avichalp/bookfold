@@ -33,14 +33,15 @@ test('createTempoWallet stores a reusable wallet in the app keychain namespace',
   const created = createTempoWallet({ store });
   const resolved = resolveTempoWallet({ store });
 
-  assert.equal(created.source, 'summ-tempo');
-  assert.equal(resolved?.source, 'summ-tempo');
+  assert.equal(created.source, 'app');
+  assert.equal(resolved?.source, 'app');
   assert.equal(resolved?.address, created.address);
+  assert.equal(created.serviceName, 'bookfold');
 });
 
 test('resolveTempoPrivateKey prefers env over stored keys', () => {
   const store = createMemoryStore();
-  store.set('summ-tempo', 'default', '0x1111111111111111111111111111111111111111111111111111111111111111');
+  store.set('bookfold', 'default', '0x1111111111111111111111111111111111111111111111111111111111111111');
 
   const resolved = resolveTempoPrivateKey({
     envPrivateKey: '0x2222222222222222222222222222222222222222222222222222222222222222',
@@ -91,13 +92,13 @@ test('createSystemSecretStore uses prompt mode on macOS so the secret is not pas
     }) as typeof childProcess.execFileSync
   });
 
-  store.set('summ-tempo', 'default', 'super-secret');
+  store.set('bookfold', 'default', 'super-secret');
 
   assert.equal(calls.length, 1);
   assert.equal(calls[0]?.file, 'security');
   assert.deepEqual(
     calls[0]?.args,
-    ['add-generic-password', '-s', 'summ-tempo', '-a', 'default', '-U', '-w']
+    ['add-generic-password', '-s', 'bookfold', '-a', 'default', '-U', '-w']
   );
   assert.equal(
     (calls[0]?.options as { input?: string } | undefined)?.input,

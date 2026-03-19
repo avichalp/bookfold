@@ -27,7 +27,7 @@
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "paths": {
-      "@summ-tempo/sdk": [
+      "@bookfold/sdk": [
         "./packages/sdk/src/index.ts"
       ]
     }

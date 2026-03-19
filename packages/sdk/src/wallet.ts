@@ -3,12 +3,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
+import { APP_NAME } from './config.js';
 
-const APP_SERVICE_NAME = 'summ-tempo';
+const APP_SERVICE_NAME = APP_NAME;
 const APP_ACCOUNT_NAME = 'default';
 const MPPX_SERVICE_NAME = 'mppx';
 
-export type TempoWalletSource = 'env' | 'summ-tempo' | 'mppx';
+export type TempoWalletSource = 'env' | 'app' | 'mppx';
 
 export interface TempoWalletInfo {
   address: `0x${string}`;
@@ -49,7 +50,7 @@ export function resolveTempoWallet(options: {
     }
     return {
       address: privateKeyToAccount(privateKey).address,
-      source: 'summ-tempo',
+      source: 'app',
       accountName: APP_ACCOUNT_NAME,
       serviceName: APP_SERVICE_NAME
     };
@@ -120,7 +121,7 @@ export function createTempoWallet(options: {
     }
     return {
       address: privateKeyToAccount(privateKey).address,
-      source: 'summ-tempo',
+      source: 'app',
       accountName: APP_ACCOUNT_NAME,
       serviceName: APP_SERVICE_NAME
     };
@@ -138,7 +139,7 @@ export function createTempoWallet(options: {
 
   return {
     address: privateKeyToAccount(privateKey).address,
-    source: 'summ-tempo',
+    source: 'app',
     accountName: APP_ACCOUNT_NAME,
     serviceName: APP_SERVICE_NAME
   };

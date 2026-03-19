@@ -12,7 +12,7 @@ import {
 } from '../src/recovery.js';
 
 class MemoryRecoveryStore implements TempoRecoveryStore {
-  readonly filePath = '/tmp/summ-tempo-recovery.json';
+  readonly filePath = '/tmp/bookfold-recovery.json';
 
   private entries: TempoRecoveryEntry[];
 
@@ -61,7 +61,7 @@ function createEntry(overrides: Partial<TempoRecoveryEntry> = {}): TempoRecovery
 }
 
 test('FileTempoRecoveryStore upserts and removes entries on disk', async () => {
-  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'summ-tempo-recovery-'));
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'bookfold-recovery-'));
   const filePath = path.join(tempDir, 'recovery.json');
   const store = new FileTempoRecoveryStore(filePath);
   const first = createEntry();

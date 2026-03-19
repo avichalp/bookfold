@@ -1,8 +1,8 @@
-# summ-tempo
+# Bookfold
 
-`summ-tempo` is a local CLI-first book summarizer. It reads a local PDF or EPUB, parses it on-device, orchestrates summarization locally, pays OpenAI's MPP endpoint directly through a Tempo session, prints the summary locally, and closes the session at the end of the run.
+`bookfold` is a local CLI-first book summarizer. It reads a local PDF or EPUB, parses it on-device, orchestrates summarization locally, pays OpenAI's MPP endpoint directly through a Tempo session, prints the summary locally, and closes the session at the end of the run.
 
-This repo intentionally has no server, no web app, and no product persistence. The only local state outside the system keychain is minimal manual-recovery metadata in `~/.summ-tempo/recovery.json`.
+This repo intentionally has no server, no web app, and no product persistence. The only local state outside the system keychain is minimal manual-recovery metadata in `~/.bookfold/recovery.json`.
 
 ## Architecture
 
@@ -24,7 +24,7 @@ The repo is split into exactly two packages:
 
 ## Hardcoded Configuration
 
-These defaults live in source code in [`packages/sdk/src/config.ts`](/Users/avichalpandey/work/summ-tempo/packages/sdk/src/config.ts):
+These defaults live in source code in [`packages/sdk/src/config.ts`](./packages/sdk/src/config.ts):
 
 - OpenAI MPP base URL: `https://openai.mpp.tempo.xyz`
 - OpenAI endpoint path: `POST /v1/chat/completions`
@@ -33,7 +33,7 @@ These defaults live in source code in [`packages/sdk/src/config.ts`](/Users/avic
 - EPUB decompressed size limit: `500 MB`
 - Request timeout: `120000 ms`
 - Map concurrency: `3`
-- Prompt version: `summ-tempo-v1`
+- Prompt version: `bookfold-v1`
 
 Detail profiles:
 
@@ -52,7 +52,7 @@ Detail profiles:
 
 ## Environment Variables
 
-Normal CLI usage does not require any env var. On first run, `summ-tempo` can create a Tempo wallet locally and store it in the system keychain, then reuse it automatically on later runs.
+Normal CLI usage does not require any env var. On first run, `bookfold` can create a Tempo wallet locally and store it in the system keychain, then reuse it automatically on later runs.
 
 Optional override:
 
@@ -134,12 +134,12 @@ Recovery command:
 
 ## SDK API
 
-Public SDK entrypoints live in [`packages/sdk/src/index.ts`](/Users/avichalpandey/work/summ-tempo/packages/sdk/src/index.ts).
+Public SDK entrypoints live in [`packages/sdk/src/index.ts`](./packages/sdk/src/index.ts).
 
 Primary API:
 
 ```ts
-import { summarizeBook } from '@summ-tempo/sdk'
+import { summarizeBook } from '@bookfold/sdk'
 
 const result = await summarizeBook({
   filePath: './book.pdf',
@@ -201,10 +201,10 @@ High level flow:
 
 ## Manual Recovery
 
-If the process terminates abnormally after opening a Tempo channel, `summ-tempo` keeps minimal recovery metadata in:
+If the process terminates abnormally after opening a Tempo channel, `bookfold` keeps minimal recovery metadata in:
 
 ```text
-~/.summ-tempo/recovery.json
+~/.bookfold/recovery.json
 ```
 
 Stored fields are limited to the channel id, last accepted cumulative amount, request URL/kind, payer address, chain id, escrow contract, fee token, and timestamps. The CLI does not try to recover automatically during `summarize`; recovery is manual so summary runs are not delayed.
@@ -278,7 +278,7 @@ npx tsx -e "import { OpenAiMppProvider } from './packages/sdk/src/provider/opena
 
 - local CLI only
 - one in-memory Tempo session per run
-- abnormal termination may leave a session/channel needing manual recovery with `summ-tempo recover`
-- no saved summaries or session persistence; only minimal recovery metadata is written to `~/.summ-tempo/recovery.json`
+- abnormal termination may leave a session/channel needing manual recovery with `bookfold recover`
+- no saved summaries or session persistence; only minimal recovery metadata is written to `~/.bookfold/recovery.json`
 - no chat
 - no embeddings or vector search
