@@ -20,7 +20,7 @@
     "typecheck": "tsc -b --pretty false",
     "dead-code": "knip --include exports,types,files --no-config-hints",
     "test": "tsx --test packages/sdk/test/**/*.test.ts packages/cli/test/**/*.test.ts",
-    "verify": "npm run typecheck && npm run test"
+    "verify": "bun run typecheck && bun run test"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
