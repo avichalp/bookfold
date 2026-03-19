@@ -515,8 +515,13 @@ async function confirmPrompt(message: string, defaultYes = false): Promise<boole
 }
 
 async function main(): Promise<void> {
-  const exitCode = await runCli(process.argv.slice(2));
-  process.exitCode = exitCode;
+  try {
+    const exitCode = await runCli(process.argv.slice(2));
+    process.exitCode = exitCode;
+  } catch (error) {
+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+    process.exitCode = 1;
+  }
 }
 
 if (process.argv[1]) {

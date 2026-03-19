@@ -6,7 +6,7 @@ import { tempo as tempoChain } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import { CLI_NAME, REQUEST_TIMEOUT_MS, TEMPO_MAX_DEPOSIT } from '../config.js';
 import type { TempoRecoveryEntry, TempoRecoveryStore } from '../recovery.js';
-import { resolveTempoPrivateKey } from '../wallet.js';
+import { formatWalletFundingMessage, resolveTempoPrivateKey } from '../wallet.js';
 
 export interface TempoSessionReceipt {
   method: 'tempo';
@@ -165,7 +165,7 @@ export class TempoSessionClient {
 
       return undefined;
     } catch (error) {
-      const message = normalizeSessionError(error, 'Failed to close Tempo session');
+      const message = normalizeSessionError(error, 'Failed to close Tempo session', this.payerAddress);
       this.state.closeError = message;
       throw new Error(message);
     }
@@ -229,7 +229,7 @@ export class TempoSessionClient {
     try {
       response = await this.manager.fetch(input, { ...init, signal });
     } catch (error) {
-      throw new Error(normalizeSessionError(error));
+      throw new Error(normalizeSessionError(error, 'Tempo session request failed', this.payerAddress));
     }
 
     const receipt = coerceReceipt(response.receipt);
@@ -652,7 +652,43 @@ async function readErrorResponse(response: Response): Promise<string> {
   }
 }
 
-function normalizeSessionError(error: unknown, prefix = 'Tempo session request failed'): string {
+export function normalizeSessionError(
+  error: unknown,
+  prefix = 'Tempo session request failed',
+  payerAddress?: `0x${string}`
+): string {
   const message = error instanceof Error ? error.message : String(error);
-  return `${prefix}: ${message}`;
+  const fundingMessage = formatFundingError(message, payerAddress);
+  return fundingMessage ? `${prefix}: ${fundingMessage}` : `${prefix}: ${message}`;
+}
+
+function formatFundingError(
+  message: string,
+  payerAddress?: `0x${string}`
+): string | undefined {
+  if (!/InsufficientBalance/i.test(message)) {
+    return undefined;
+  }
+
+  const lines = [
+    payerAddress
+      ? `Tempo wallet ${payerAddress} does not have enough fee-token balance for this request.`
+      : 'Tempo wallet does not have enough fee-token balance for this request.'
+  ];
+
+  if (payerAddress) {
+    lines.push(formatWalletFundingMessage(payerAddress));
+  }
+
+  const primaryReason = extractPrimaryErrorLine(message);
+  if (primaryReason) {
+    lines.push(`Upstream reason: ${primaryReason}`);
+  }
+
+  return lines.join('\n');
+}
+
+function extractPrimaryErrorLine(message: string): string {
+  const [firstParagraph] = message.trim().split(/\n\s*\n/u, 1);
+  return firstParagraph?.trim() ?? '';
 }
