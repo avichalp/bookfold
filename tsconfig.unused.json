@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "declaration": false,
+    "noEmit": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
+  },
+  "include": [
+    "packages/sdk/src/**/*.ts",
+    "packages/cli/src/**/*.ts"
+  ]
+}

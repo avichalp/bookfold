@@ -14,7 +14,7 @@
     "clean": "rm -rf packages/sdk/dist packages/cli/dist",
     "lint": "eslint packages",
     "typecheck": "tsc -b --pretty false",
-    "typecheck:unused": "tsc -p packages/sdk/tsconfig.json --noEmit --noUnusedLocals --noUnusedParameters && tsc -p packages/cli/tsconfig.json --noEmit --noUnusedLocals --noUnusedParameters",
+    "typecheck:unused": "tsc -p tsconfig.unused.json --pretty false",
     "dead-code": "npm run typecheck:unused && knip",
     "test": "tsx --test packages/sdk/test/**/*.test.ts packages/cli/test/**/*.test.ts",
     "verify": "npm run typecheck && npm run test"
