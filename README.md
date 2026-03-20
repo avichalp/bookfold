@@ -73,6 +73,12 @@ bun run verify
 - install target for Codex-style agents: `~/.codex/skills/bookfold/SKILL.md`
 - published GitHub path: `https://github.com/avichalp/bookfold/tree/main/skills/bookfold`
 
+install with Skills CLI:
+
+```bash
+npx skills add https://github.com/avichalp/bookfold --skill bookfold -g -y
+```
+
 manual install:
 
 ```bash
