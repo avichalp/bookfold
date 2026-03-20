@@ -7,7 +7,7 @@ import {
 } from '@bookfold/sdk';
 import { formatUnits } from 'viem';
 
-export interface OutputOptions {
+interface OutputOptions {
   color?: boolean | undefined;
 }
 
