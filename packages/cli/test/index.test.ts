@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { stripVTControlCharacters } from 'node:util';
 import { InvalidTempoWalletError } from '@bookfold/sdk';
 import { runCli } from '../src/index.js';
 
@@ -18,7 +19,7 @@ class TtyBufferWriter extends BufferWriter {
 }
 
 function stripAnsi(value: string): string {
-  return value.replace(/\u001b\[[0-9;?]*[ -/]*[@-~]/g, '');
+  return stripVTControlCharacters(value);
 }
 
 function createSummaryResult() {
