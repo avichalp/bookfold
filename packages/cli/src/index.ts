@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url';
 import {
   createTempoWallet,
   getTempoWalletBalance,
+  InvalidTempoWalletError,
   recoverTempoSessions,
   resolveTempoWallet,
   summarizeBook,
@@ -118,7 +119,14 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
 
   if (parsed.command === 'wallet-init') {
     try {
-      const existing = resolveWallet();
+      let existing: TempoWalletInfo | undefined;
+      try {
+        existing = resolveWallet();
+      } catch (error) {
+        if (!(error instanceof InvalidTempoWalletError)) {
+          throw error;
+        }
+      }
       if (existing && !parsed.force) {
         stdout.write(
           formatWalletInfo(existing, stdoutOptions, [

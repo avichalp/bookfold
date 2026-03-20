@@ -18,10 +18,51 @@ export interface TempoWalletInfo {
   serviceName: string;
 }
 
+export class InvalidTempoWalletError extends Error {
+  readonly source: Exclude<TempoWalletSource, 'env'>;
+
+  constructor(source: Exclude<TempoWalletSource, 'env'>) {
+    super(
+      source === 'app'
+        ? 'Stored Bookfold wallet is invalid. Run `bookfold wallet init --force` to replace it.'
+        : 'Stored mppx default account wallet is invalid. Update the mppx default account or set TEMPO_PRIVATE_KEY.'
+    );
+    this.name = 'InvalidTempoWalletError';
+    this.source = source;
+  }
+}
+
 interface SecretStore {
   get(serviceName: string, accountName: string): string | undefined;
   set(serviceName: string, accountName: string, secret: string): void;
   delete(serviceName: string, accountName: string): void;
+}
+
+interface WalletRuntime {
+  execFileSync: typeof childProcess.execFileSync;
+  homedir: typeof os.homedir;
+  platform: typeof os.platform;
+  readFileSync: typeof fs.readFileSync;
+}
+
+const defaultWalletRuntime: WalletRuntime = {
+  execFileSync: childProcess.execFileSync,
+  homedir: os.homedir,
+  platform: os.platform,
+  readFileSync: fs.readFileSync
+};
+
+let walletRuntime: WalletRuntime = defaultWalletRuntime;
+
+export function setWalletRuntimeForTests(runtime: Partial<WalletRuntime>): void {
+  walletRuntime = {
+    ...defaultWalletRuntime,
+    ...runtime
+  };
+}
+
+export function resetWalletRuntimeForTests(): void {
+  walletRuntime = defaultWalletRuntime;
 }
 
 export function resolveTempoWallet(): TempoWalletInfo | undefined {
@@ -41,7 +82,7 @@ export function resolveTempoWallet(): TempoWalletInfo | undefined {
 
   const appKey = store.get(APP_SERVICE_NAME, APP_ACCOUNT_NAME);
   if (appKey) {
-    const privateKey = normalizePrivateKey(appKey);
+    const privateKey = normalizeStoredPrivateKey(appKey, 'app');
     if (!privateKey) {
       return undefined;
     }
@@ -56,7 +97,7 @@ export function resolveTempoWallet(): TempoWalletInfo | undefined {
   const mppxAccountName = resolveMppxDefaultAccountName();
   const mppxKey = store.get(MPPX_SERVICE_NAME, mppxAccountName);
   if (mppxKey) {
-    const privateKey = normalizePrivateKey(mppxKey);
+    const privateKey = normalizeStoredPrivateKey(mppxKey, 'mppx');
     if (!privateKey) {
       return undefined;
     }
@@ -83,7 +124,7 @@ export function resolveTempoPrivateKey(): `0x${string}` | undefined {
 
   const appKey = store.get(APP_SERVICE_NAME, APP_ACCOUNT_NAME);
   if (appKey) {
-    const privateKey = normalizePrivateKey(appKey);
+    const privateKey = normalizeStoredPrivateKey(appKey, 'app');
     if (privateKey) {
       return privateKey;
     }
@@ -92,7 +133,7 @@ export function resolveTempoPrivateKey(): `0x${string}` | undefined {
   const mppxAccountName = resolveMppxDefaultAccountName();
   const mppxKey = store.get(MPPX_SERVICE_NAME, mppxAccountName);
   if (mppxKey) {
-    const privateKey = normalizePrivateKey(mppxKey);
+    const privateKey = normalizeStoredPrivateKey(mppxKey, 'mppx');
     if (privateKey) {
       return privateKey;
     }
@@ -107,16 +148,22 @@ export function createTempoWallet(options: {
   const store = createSystemSecretStore();
   const existing = store.get(APP_SERVICE_NAME, APP_ACCOUNT_NAME);
   if (existing && !options.overwrite) {
-    const privateKey = normalizePrivateKey(existing);
-    if (!privateKey) {
-      throw new Error('Stored wallet is invalid.');
+    try {
+      const privateKey = normalizeStoredPrivateKey(existing, 'app');
+      if (!privateKey) {
+        throw new Error('Stored wallet is invalid.');
+      }
+      return {
+        address: privateKeyToAccount(privateKey).address,
+        source: 'app',
+        accountName: APP_ACCOUNT_NAME,
+        serviceName: APP_SERVICE_NAME
+      };
+    } catch (error) {
+      if (!(error instanceof InvalidTempoWalletError)) {
+        throw error;
+      }
     }
-    return {
-      address: privateKeyToAccount(privateKey).address,
-      source: 'app',
-      accountName: APP_ACCOUNT_NAME,
-      serviceName: APP_SERVICE_NAME
-    };
   }
 
   const privateKey = generatePrivateKey();
@@ -136,8 +183,8 @@ export function createTempoWallet(options: {
 }
 
 function createSystemSecretStore(): SecretStore {
-  const platform = os.platform();
-  const execFileSync = childProcess.execFileSync;
+  const platform = walletRuntime.platform();
+  const execFileSync = walletRuntime.execFileSync;
 
   if (platform === 'darwin') {
     return {
@@ -153,12 +200,14 @@ function createSystemSecretStore(): SecretStore {
         }
       },
       set(serviceName, accountName, secret) {
-        // Prompt mode keeps the secret out of the child process argv.
+        // `security add-generic-password ... -w` prompts on the TTY when the
+        // password is omitted, so feed the command through interactive mode
+        // instead of relying on stdin for prompt responses.
         execFileSync(
           'security',
-          ['add-generic-password', '-s', serviceName, '-a', accountName, '-U', '-w'],
+          ['-i', '-q'],
           {
-            input: `${secret}\n${secret}\n`,
+            input: buildMacosAddPasswordCommand(serviceName, accountName, secret),
             stdio: ['pipe', 'ignore', 'ignore'],
             encoding: 'utf8'
           }
@@ -213,6 +262,22 @@ function createSystemSecretStore(): SecretStore {
   );
 }
 
+function buildMacosAddPasswordCommand(
+  serviceName: string,
+  accountName: string,
+  secret: string
+): string {
+  return `add-generic-password -a ${quoteMacosSecurityArgument(accountName)} -s ${quoteMacosSecurityArgument(serviceName)} -U -w ${quoteMacosSecurityArgument(secret)}\n`;
+}
+
+function quoteMacosSecurityArgument(value: string): string {
+  if (value.length === 0) {
+    return "''";
+  }
+
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
 function normalizePrivateKey(
   value: string | undefined,
   options: { allowEmpty?: boolean | undefined } = {}
@@ -233,6 +298,21 @@ function normalizePrivateKey(
   return normalized as `0x${string}`;
 }
 
+function normalizeStoredPrivateKey(
+  value: string | undefined,
+  source: Exclude<TempoWalletSource, 'env'>
+): `0x${string}` | undefined {
+  try {
+    return normalizePrivateKey(value, { allowEmpty: true });
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Tempo private key must be a 32-byte hex private key.') {
+      throw new InvalidTempoWalletError(source);
+    }
+
+    throw error;
+  }
+}
+
 export function formatWalletFundingMessage(address: string): string {
   return [
     `Wallet address: ${address}`,
@@ -243,11 +323,11 @@ export function formatWalletFundingMessage(address: string): string {
 function resolveMppxDefaultAccountName(): string {
   try {
     const configPath = path.join(
-      process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'),
+      process.env.XDG_CONFIG_HOME || path.join(walletRuntime.homedir(), '.config'),
       'mppx',
       'default'
     );
-    return fs.readFileSync(configPath, 'utf8').trim() || 'main';
+    return walletRuntime.readFileSync(configPath, 'utf8').trim() || 'main';
   } catch {
     return 'main';
   }
