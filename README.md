@@ -115,6 +115,7 @@ bun run bookfold:dev ./book.pdf
 - `summarize` defaults to `--detail medium`
 - summary text or JSON goes to `stdout`
 - progress, payment metadata, and file-write logs go to `stderr`
+- interactive TTY runs show a live summarize progress bar on `stderr`
 - `recover` exits non-zero for failed entries and wallet mismatches
 - `wallet balance` shows the active Tempo wallet, the effective fee token balance, the `pathUSD` fallback balance, and `USDC`
 

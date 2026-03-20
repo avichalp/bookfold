@@ -64,10 +64,16 @@ export interface SummaryResult {
   warnings?: string[] | undefined;
 }
 
+export interface ProgressSnapshot {
+  completed: number;
+  total: number;
+}
+
 export interface ProgressEvent {
   step: 'load' | 'parse' | 'summarize' | 'close-session';
   message: string;
   detail?: Record<string, unknown> | undefined;
+  progress?: ProgressSnapshot | undefined;
 }
 
 export interface SummarizationProvider {

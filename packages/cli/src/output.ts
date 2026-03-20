@@ -142,6 +142,22 @@ function formatEffectiveFeeTokenSource(
   return source === 'account-preference' ? 'Account preference' : 'pathUSD fallback';
 }
 
+function truncateText(value: string, maxLength: number): string {
+  if (maxLength <= 0) {
+    return '';
+  }
+
+  if (value.length <= maxLength) {
+    return value;
+  }
+
+  if (maxLength <= 3) {
+    return '.'.repeat(maxLength);
+  }
+
+  return `${value.slice(0, maxLength - 3)}...`;
+}
+
 export function formatUsage(cliName: string, options: OutputOptions = {}): string {
   return [
     renderHeading('Bookfold CLI', options),
@@ -335,6 +351,60 @@ export function formatLogLine(
     tag === 'warning' ? ANSI.yellow : tag === 'error' ? ANSI.red : tag === 'done' ? ANSI.green : ANSI.cyan;
 
   return `${paint(label, tone, options)} ${message}`;
+}
+
+export function formatProgressBar(args: {
+  completed: number;
+  total: number;
+  message: string;
+  width?: number | undefined;
+  maxWidth?: number | undefined;
+}): string {
+  const total = Math.max(1, args.total);
+  const completed = Math.min(Math.max(0, args.completed), total);
+  const ratio = completed / total;
+  const percent = `${String(Math.round(ratio * 100)).padStart(3, ' ')}%`;
+  const count = `${completed}/${total}`;
+  const buildPrefix = (barWidth: number): string => {
+    if (barWidth <= 0) {
+      return `${percent} ${count}`;
+    }
+
+    const filled = Math.min(barWidth, Math.round(ratio * barWidth));
+    const bar = `${'#'.repeat(filled)}${'-'.repeat(barWidth - filled)}`;
+    return `[${bar}] ${percent} ${count}`;
+  };
+
+  const requestedWidth =
+    args.maxWidth === undefined ? Math.max(10, args.width ?? 20) : Math.max(1, args.width ?? 20);
+  let prefix = buildPrefix(requestedWidth);
+
+  if (args.maxWidth !== undefined && prefix.length > args.maxWidth) {
+    const compactPrefix = buildPrefix(0);
+    if (compactPrefix.length > args.maxWidth) {
+      prefix = truncateText(percent.trimStart(), args.maxWidth);
+    } else {
+      const prefixOverhead = buildPrefix(1).length - 1;
+      const clampedBarWidth = Math.max(1, Math.min(requestedWidth, args.maxWidth - prefixOverhead));
+      prefix = buildPrefix(clampedBarWidth);
+    }
+  }
+
+  if (!args.message) {
+    return prefix;
+  }
+
+  if (args.maxWidth === undefined) {
+    return `${prefix} ${args.message}`;
+  }
+
+  const availableMessageWidth = args.maxWidth - prefix.length - 1;
+  if (availableMessageWidth <= 0) {
+    return prefix;
+  }
+
+  const message = truncateText(args.message, availableMessageWidth);
+  return message ? `${prefix} ${message}` : prefix;
 }
 
 export function formatProgressDetail(
