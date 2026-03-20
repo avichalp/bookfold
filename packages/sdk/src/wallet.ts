@@ -45,6 +45,10 @@ interface WalletRuntime {
   readFileSync: typeof fs.readFileSync;
 }
 
+declare global {
+  var __BOOKFOLD_WALLET_RUNTIME_FOR_TESTS__: Partial<WalletRuntime> | undefined;
+}
+
 const defaultWalletRuntime: WalletRuntime = {
   execFileSync: childProcess.execFileSync,
   homedir: os.homedir,
@@ -52,17 +56,11 @@ const defaultWalletRuntime: WalletRuntime = {
   readFileSync: fs.readFileSync
 };
 
-let walletRuntime: WalletRuntime = defaultWalletRuntime;
-
-export function setWalletRuntimeForTests(runtime: Partial<WalletRuntime>): void {
-  walletRuntime = {
+function getWalletRuntime(): WalletRuntime {
+  return {
     ...defaultWalletRuntime,
-    ...runtime
+    ...(globalThis.__BOOKFOLD_WALLET_RUNTIME_FOR_TESTS__ ?? {})
   };
-}
-
-export function resetWalletRuntimeForTests(): void {
-  walletRuntime = defaultWalletRuntime;
 }
 
 export function resolveTempoWallet(): TempoWalletInfo | undefined {
@@ -183,6 +181,7 @@ export function createTempoWallet(options: {
 }
 
 function createSystemSecretStore(): SecretStore {
+  const walletRuntime = getWalletRuntime();
   const platform = walletRuntime.platform();
   const execFileSync = walletRuntime.execFileSync;
 
@@ -322,6 +321,7 @@ export function formatWalletFundingMessage(address: string): string {
 
 function resolveMppxDefaultAccountName(): string {
   try {
+    const walletRuntime = getWalletRuntime();
     const configPath = path.join(
       process.env.XDG_CONFIG_HOME || path.join(walletRuntime.homedir(), '.config'),
       'mppx',

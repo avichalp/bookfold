@@ -5,11 +5,22 @@ import {
   createTempoWallet,
   formatWalletFundingMessage,
   InvalidTempoWalletError,
-  resetWalletRuntimeForTests,
   resolveTempoPrivateKey,
-  resolveTempoWallet,
-  setWalletRuntimeForTests
+  resolveTempoWallet
 } from '../src/wallet.js';
+
+function setWalletRuntimeForTests(runtime: {
+  execFileSync?: typeof import('node:child_process').execFileSync;
+  homedir?: typeof import('node:os').homedir;
+  platform?: typeof import('node:os').platform;
+  readFileSync?: typeof import('node:fs').readFileSync;
+}): void {
+  globalThis.__BOOKFOLD_WALLET_RUNTIME_FOR_TESTS__ = runtime;
+}
+
+function resetWalletRuntimeForTests(): void {
+  globalThis.__BOOKFOLD_WALLET_RUNTIME_FOR_TESTS__ = undefined;
+}
 
 async function withTempoPrivateKey<T>(
   value: string | undefined,
