@@ -24,6 +24,7 @@ import {
   formatFundingInstructions,
   formatLogLine,
   formatPaymentSummary,
+  formatProgressBar,
   formatProgressDetail,
   formatRecoveryReport,
   formatUsage,
@@ -33,7 +34,80 @@ import {
 
 interface Writer {
   isTTY?: boolean | undefined;
+  columns?: number | undefined;
   write(chunk: string): void;
+}
+
+const ANSI_CLEAR_LINE = '\u001b[2K';
+
+class LiveProgressLine {
+  private line = '';
+
+  private active = false;
+
+  constructor(private readonly writer: Writer) {}
+
+  hasActiveLine(): boolean {
+    return this.active;
+  }
+
+  render(line: string): void {
+    if (!this.writer.isTTY) {
+      return;
+    }
+
+    this.writer.write(`\r${ANSI_CLEAR_LINE}${line}`);
+    this.line = line;
+    this.active = true;
+  }
+
+  clear(): void {
+    if (!this.writer.isTTY || !this.active) {
+      return;
+    }
+
+    this.writer.write(`\r${ANSI_CLEAR_LINE}`);
+    this.line = '';
+    this.active = false;
+  }
+
+  commit(): void {
+    if (!this.writer.isTTY || !this.active) {
+      return;
+    }
+
+    this.writer.write(`\r${ANSI_CLEAR_LINE}${this.line}\n`);
+    this.line = '';
+    this.active = false;
+  }
+
+  print(text: string): void {
+    if (!this.writer.isTTY || !this.active) {
+      this.writer.write(text);
+      return;
+    }
+
+    const line = this.line;
+    this.clear();
+    this.writer.write(text);
+    this.render(line);
+  }
+}
+
+function getProgressBarWidth(columns?: number): number {
+  if (!columns || columns < 60) {
+    return 10;
+  }
+
+  if (columns < 80) {
+    return 14;
+  }
+
+  if (columns < 100) {
+    return 18;
+  }
+
+  return 24;
 }
 
 interface CliDependencies {
@@ -221,6 +295,7 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
   }
 
   const summarizeArgs = parsed;
+  const summarizeProgress = new LiveProgressLine(stderr);
 
   if (!resolveWallet()) {
     if (isInteractive()) {
@@ -263,6 +338,23 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
   }
 
   const logProgress = (event: ProgressEvent) => {
+    if (event.step === 'summarize' && event.progress && stderr.isTTY) {
+      summarizeProgress.render(
+        formatProgressBar({
+          completed: event.progress.completed,
+          total: event.progress.total,
+          message: event.message,
+          width: getProgressBarWidth(stderr.columns),
+          maxWidth: stderr.columns
+        })
+      );
+      if (summarizeArgs.verbose && event.detail) {
+        summarizeProgress.print(`${formatProgressDetail(event.detail, stderrOptions)}\n`);
+      }
+      return;
+    }
+
+    summarizeProgress.commit();
     stderr.write(`${formatLogLine(event.step, event.message, stderrOptions)}\n`);
     if (summarizeArgs.verbose && event.detail) {
       stderr.write(`${formatProgressDetail(event.detail, stderrOptions)}\n`);
@@ -275,6 +367,7 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
       detail: summarizeArgs.detail,
       onProgress: logProgress
     });
+    summarizeProgress.commit();
 
     const payload = summarizeArgs.json ? `${JSON.stringify(result, null, 2)}\n` : `${result.summary}\n`;
 
@@ -306,6 +399,7 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
 
     return 0;
   } catch (error) {
+    summarizeProgress.commit();
     stderr.write(
       `${formatLogLine('error', error instanceof Error ? error.message : String(error), stderrOptions)}\n`
     );

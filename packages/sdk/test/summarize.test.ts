@@ -107,6 +107,53 @@ test('medium detail uses map-reduce for larger books', async () => {
   assert.ok(countWords(result.summary) <= 900);
 });
 
+test('summarize progress reports completed model calls', async () => {
+  const provider = new MockProvider();
+  const progressSnapshots: Array<{ message: string; completed: number; total: number }> = [];
+
+  await summarizeParsedBook({
+    book: createBook(7),
+    detail: 'medium',
+    provider,
+    onProgress: (event) => {
+      if (event.step !== 'summarize' || !event.progress) {
+        return;
+      }
+
+      progressSnapshots.push({
+        message: event.message,
+        completed: event.progress.completed,
+        total: event.progress.total
+      });
+    }
+  });
+
+  assert.ok(progressSnapshots.length >= 3);
+  assert.deepEqual(progressSnapshots[0], {
+    message: 'Running medium map-reduce summary across 4 chunk groups.',
+    completed: 0,
+    total: 5
+  });
+  assert.ok(
+    progressSnapshots.some(
+      (snapshot) =>
+        snapshot.message === 'Synthesizing final book summary.' &&
+        snapshot.completed === 4 &&
+        snapshot.total === 5
+    )
+  );
+  assert.deepEqual(progressSnapshots.at(-1), {
+    message: 'Synthesizing final book summary.',
+    completed: 5,
+    total: 5
+  });
+
+  for (let index = 1; index < progressSnapshots.length; index += 1) {
+    assert.ok(progressSnapshots[index].completed >= progressSnapshots[index - 1].completed);
+    assert.equal(progressSnapshots[index].total, 5);
+  }
+});
+
 test('long detail uses section-aware map-reduce when TOC data exists', async () => {
   const provider = new MockProvider();
   const result = await summarizeParsedBook({

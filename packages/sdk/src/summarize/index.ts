@@ -23,6 +23,7 @@ interface SectionGroup {
 }
 
 type PreparedSummaryResult = Omit<SummaryResult, 'payment'>;
+const COLLAPSE_GROUP_SIZE = 6;
 
 export async function summarizeParsedBook(args: {
   book: ParsedBook;
@@ -39,6 +40,25 @@ export async function summarizeParsedBook(args: {
   let modelCallCount = 0;
   let strategy = profile.strategy;
   let sectionCount = 0;
+  let summarizeMessage = 'Generating summary.';
+  let summarizeProgressCompleted = 0;
+  let summarizeProgressTotal = 0;
+
+  const emitSummarizeProgress = (message = summarizeMessage, detail?: Record<string, unknown>) => {
+    summarizeMessage = message;
+    onProgress?.({
+      step: 'summarize',
+      message,
+      detail,
+      progress:
+        summarizeProgressTotal > 0
+          ? {
+              completed: summarizeProgressCompleted,
+              total: summarizeProgressTotal
+            }
+          : undefined
+    });
+  };
 
   const generate = async (parameters: {
     messages: Parameters<typeof buildSinglePassPrompt>[0] extends never ? never : ReturnType<typeof buildSinglePassPrompt>;
@@ -57,16 +77,17 @@ export async function summarizeParsedBook(args: {
 
     modelCallCount += 1;
     modelNames.add(result.model);
+    summarizeProgressCompleted += 1;
+    emitSummarizeProgress();
     return result.text.trim();
   };
 
   let summary: string;
 
   if (detail === 'short' && canUseSinglePass(book)) {
-    onProgress?.({
-      step: 'summarize',
-      message: 'Running short single-pass summary.',
-      detail: { chunkCount: book.chunks.length }
+    summarizeProgressTotal = 1;
+    emitSummarizeProgress('Running short single-pass summary.', {
+      chunkCount: book.chunks.length
     });
 
     summary = await generate({
@@ -86,10 +107,10 @@ export async function summarizeParsedBook(args: {
       warnings.push('Long detail fell back to synthetic sections because no reliable TOC-based grouping was available.');
     }
 
-    onProgress?.({
-      step: 'summarize',
-      message: `Summarizing ${sections.length} long-form sections.`,
-      detail: { sectionCount: sections.length, chunkCount: book.chunks.length }
+    summarizeProgressTotal = sections.length + estimateCollapseCallCount(sections.length) + 1;
+    emitSummarizeProgress(`Summarizing ${sections.length} long-form sections.`, {
+      sectionCount: sections.length,
+      chunkCount: book.chunks.length
     });
 
     const sectionNotes = await mapWithConcurrency(sections, MAP_CONCURRENCY, async (section) => {
@@ -110,12 +131,12 @@ export async function summarizeParsedBook(args: {
       notes: sectionNotes,
       detail,
       metadata,
-      provider,
       signal,
-      onProgress,
+      onStage: emitSummarizeProgress,
       generate
     });
 
+    emitSummarizeProgress('Synthesizing final book summary.');
     summary = await generate({
       messages: buildReducePrompt({
         detail,
@@ -129,10 +150,10 @@ export async function summarizeParsedBook(args: {
   } else {
     const groups = chunkBySize(book.chunks, profile.mapGroupSize);
 
-    onProgress?.({
-      step: 'summarize',
-      message: `Running ${detail} map-reduce summary across ${groups.length} chunk groups.`,
-      detail: { groupCount: groups.length, chunkCount: book.chunks.length }
+    summarizeProgressTotal = groups.length + estimateCollapseCallCount(groups.length) + 1;
+    emitSummarizeProgress(`Running ${detail} map-reduce summary across ${groups.length} chunk groups.`, {
+      groupCount: groups.length,
+      chunkCount: book.chunks.length
     });
 
     const mapNotes = await mapWithConcurrency(groups, MAP_CONCURRENCY, async (group, index) => {
@@ -152,12 +173,12 @@ export async function summarizeParsedBook(args: {
       notes: mapNotes,
       detail,
       metadata,
-      provider,
       signal,
-      onProgress,
+      onStage: emitSummarizeProgress,
       generate
     });
 
+    emitSummarizeProgress('Synthesizing final book summary.');
     summary = await generate({
       messages: buildReducePrompt({
         detail,
@@ -191,9 +212,8 @@ async function collapseNotes(args: {
   notes: string[];
   detail: DetailLevel;
   metadata: SummaryMetadata;
-  provider: SummarizationProvider;
   signal?: AbortSignal | undefined;
-  onProgress?: ((event: ProgressEvent) => void) | undefined;
+  onStage?: ((message: string, detail?: Record<string, unknown>) => void) | undefined;
   generate: (parameters: {
     messages: ReturnType<typeof buildSinglePassPrompt>;
     maxWords: number;
@@ -204,11 +224,10 @@ async function collapseNotes(args: {
   let round = 1;
 
   while (notes.length > 6) {
-    const groups = chunkBySize(notes, 6);
-    args.onProgress?.({
-      step: 'summarize',
-      message: `Collapsing ${notes.length} intermediate notes (round ${round}).`,
-      detail: { round, groups: groups.length }
+    const groups = chunkBySize(notes, COLLAPSE_GROUP_SIZE);
+    args.onStage?.(`Collapsing ${notes.length} intermediate notes (round ${round}).`, {
+      round,
+      groups: groups.length
     });
 
     notes = await mapWithConcurrency(groups, MAP_CONCURRENCY, async (group, index) => {
@@ -327,6 +346,18 @@ function chunkBySize<T>(items: T[], size: number): T[][] {
     groups.push(items.slice(index, index + size));
   }
   return groups;
+}
+
+function estimateCollapseCallCount(noteCount: number): number {
+  let currentCount = noteCount;
+  let totalCalls = 0;
+
+  while (currentCount > COLLAPSE_GROUP_SIZE) {
+    currentCount = Math.ceil(currentCount / COLLAPSE_GROUP_SIZE);
+    totalCalls += currentCount;
+  }
+
+  return totalCalls;
 }
 
 async function mapWithConcurrency<TInput, TOutput>(

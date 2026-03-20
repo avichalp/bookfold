@@ -17,6 +17,7 @@ export type {
   TempoRecoveryReport
 } from './recovery.js';
 export type {
+  ProgressSnapshot,
   ProgressEvent,
   SummarizeBookOptions,
   SummaryResult

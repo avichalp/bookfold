@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   formatPaymentSummary,
+  formatProgressBar,
   formatUsage,
   formatWalletBalance
 } from '../src/output.js';
@@ -102,4 +103,31 @@ test('formatPaymentSummary renders human-readable Tempo amounts', () => {
   assert.match(output, /Cumulative\s+0\.045 USD/);
   assert.match(output, /Reference\s+receipt-1/);
   assert.match(output, /Tx hash\s+0xabc/);
+});
+
+test('formatProgressBar truncates long status messages to fit the terminal width', () => {
+  const output = formatProgressBar({
+    completed: 3,
+    total: 5,
+    message: 'Running medium map-reduce summary across 4 chunk groups.',
+    width: 12,
+    maxWidth: 48
+  });
+
+  assert.match(output, /^\[[#-]{12}\]\s+60%\s+3\/5\s+/);
+  assert.match(output, /\.\.\.$/);
+  assert.ok(output.length <= 48);
+});
+
+test('formatProgressBar clamps the bar prefix to narrow terminal widths', () => {
+  const output = formatProgressBar({
+    completed: 3,
+    total: 5,
+    message: 'Running medium map-reduce summary across 4 chunk groups.',
+    width: 10,
+    maxWidth: 20
+  });
+
+  assert.equal(output.length, 20);
+  assert.match(output, /^\[[#-]{9}\]\s+60%\s+3\/5$/);
 });
