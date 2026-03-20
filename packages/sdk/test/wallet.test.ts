@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import type { execFileSync } from 'node:child_process';
+import type { readFileSync } from 'node:fs';
+import type { homedir, platform } from 'node:os';
 import { privateKeyToAccount } from 'viem/accounts';
 import {
   createTempoWallet,
@@ -10,10 +13,10 @@ import {
 } from '../src/wallet.js';
 
 function setWalletRuntimeForTests(runtime: {
-  execFileSync?: typeof import('node:child_process').execFileSync;
-  homedir?: typeof import('node:os').homedir;
-  platform?: typeof import('node:os').platform;
-  readFileSync?: typeof import('node:fs').readFileSync;
+  execFileSync?: typeof execFileSync;
+  homedir?: typeof homedir;
+  platform?: typeof platform;
+  readFileSync?: typeof readFileSync;
 }): void {
   globalThis.__BOOKFOLD_WALLET_RUNTIME_FOR_TESTS__ = runtime;
 }
