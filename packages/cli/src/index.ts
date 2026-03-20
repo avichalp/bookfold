@@ -6,20 +6,32 @@ import { writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import {
   createTempoWallet,
-  formatWalletFundingMessage,
+  getTempoWalletBalance,
   recoverTempoSessions,
   resolveTempoWallet,
   summarizeBook,
+  type ProgressEvent,
   type RecoverTempoSessionsOptions,
+  type SummarizeBookOptions,
+  type SummaryResult,
   type TempoRecoveryProgressEvent,
   type TempoRecoveryReport,
-  type TempoWalletInfo,
-  type ProgressEvent,
-  type SummarizeBookOptions,
-  type SummaryResult
+  type TempoWalletBalanceReport,
+  type TempoWalletInfo
 } from '@bookfold/sdk';
+import {
+  formatFundingInstructions,
+  formatLogLine,
+  formatPaymentSummary,
+  formatProgressDetail,
+  formatRecoveryReport,
+  formatUsage,
+  formatWalletBalance,
+  formatWalletInfo
+} from './output.js';
 
 interface Writer {
+  isTTY?: boolean | undefined;
   write(chunk: string): void;
 }
 
@@ -28,6 +40,7 @@ interface CliDependencies {
   recover?: (options?: RecoverTempoSessionsOptions) => Promise<TempoRecoveryReport>;
   resolveWallet?: () => TempoWalletInfo | undefined;
   createWallet?: (options?: { overwrite?: boolean | undefined }) => TempoWalletInfo;
+  walletBalance?: () => Promise<TempoWalletBalanceReport>;
   confirm?: (message: string, defaultYes?: boolean) => Promise<boolean>;
   isInteractive?: () => boolean;
   stdout?: Writer;
@@ -52,29 +65,26 @@ interface WalletAddressArgs {
   command: 'wallet-address';
 }
 
+interface WalletBalanceArgs {
+  command: 'wallet-balance';
+}
+
 interface RecoverArgs {
   command: 'recover';
   json: boolean;
   verbose: boolean;
 }
 
-type ParsedCliArgs = SummarizeArgs | WalletInitArgs | WalletAddressArgs | RecoverArgs;
+type ParsedCliArgs =
+  | SummarizeArgs
+  | WalletInitArgs
+  | WalletAddressArgs
+  | WalletBalanceArgs
+  | RecoverArgs;
 
 const CLI_NAME = 'bookfold';
-const USAGE = `Usage:
-  ${CLI_NAME} <file> [-d short|medium|long] [-j] [-o <path>] [-v]
-  ${CLI_NAME} summarize <file> [--detail short|medium|long] [--json] [--output <path>] [--verbose]
-  ${CLI_NAME} recover [-j] [-v]
-  ${CLI_NAME} wallet init [--force]
-  ${CLI_NAME} wallet address
-
-Examples:
-  ${CLI_NAME} ./book.pdf
-  ${CLI_NAME} ./book.epub -d long
-  ${CLI_NAME} sum ./book.pdf -j -o ./summary.json
-  ${CLI_NAME} recover
-  ${CLI_NAME} wallet init
-  ${CLI_NAME} wallet address`;
+const TEMPO_NETWORK = 'Tempo Mainnet (4217)';
+const TEMPO_EXPLORER = 'https://explore.tempo.xyz';
 
 export async function runCli(argv: string[], dependencies: CliDependencies = {}): Promise<number> {
   const stdout = dependencies.stdout ?? process.stdout;
@@ -83,11 +93,16 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
   const recover = dependencies.recover ?? recoverTempoSessions;
   const resolveWallet = dependencies.resolveWallet ?? (() => resolveTempoWallet());
   const createWallet = dependencies.createWallet ?? ((options) => createTempoWallet(options));
+  const walletBalance = dependencies.walletBalance ?? getTempoWalletBalance;
   const confirm = dependencies.confirm ?? ((message, defaultYes) => confirmPrompt(message, defaultYes));
   const isInteractive = dependencies.isInteractive ?? (() => Boolean(process.stdin.isTTY && process.stderr.isTTY));
+  const stdoutOptions = { color: Boolean(stdout.isTTY) };
+  const stderrOptions = { color: Boolean(stderr.isTTY) };
+  const stdoutUsage = formatUsage(CLI_NAME, stdoutOptions);
+  const stderrUsage = formatUsage(CLI_NAME, stderrOptions);
 
   if (argv.length === 0 || argv.includes('--help') || argv.includes('-h') || argv[0] === 'help') {
-    stdout.write(`${USAGE}\n`);
+    stdout.write(`${stdoutUsage}\n`);
     return 0;
   }
 
@@ -95,7 +110,9 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
   try {
     parsed = parseArgs(argv);
   } catch (error) {
-    stderr.write(`${error instanceof Error ? error.message : String(error)}\n\n${USAGE}\n`);
+    stderr.write(
+      `${formatLogLine('error', error instanceof Error ? error.message : String(error), stderrOptions)}\n\n${stderrUsage}\n`
+    );
     return 1;
   }
 
@@ -103,16 +120,33 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
     try {
       const existing = resolveWallet();
       if (existing && !parsed.force) {
-        stdout.write(`${formatWalletInfo(existing)}\n`);
+        stdout.write(
+          formatWalletInfo(existing, stdoutOptions, [
+            ['Status', 'Existing wallet'],
+            ['Network', TEMPO_NETWORK],
+            ['Explorer', `${TEMPO_EXPLORER}/address/${existing.address}`]
+          ])
+        );
+        stdout.write('\n');
+        stdout.write(formatFundingInstructions(existing.address, stdoutOptions));
         return 0;
       }
 
       const created = createWallet({ overwrite: parsed.force });
-      stdout.write(`${formatWalletInfo(created)}\n`);
-      stdout.write(`${formatWalletFundingMessage(created.address)}\n`);
+      stdout.write(
+        formatWalletInfo(created, stdoutOptions, [
+          ['Status', parsed.force ? 'Recreated wallet' : 'Created wallet'],
+          ['Network', TEMPO_NETWORK],
+          ['Explorer', `${TEMPO_EXPLORER}/address/${created.address}`]
+        ])
+      );
+      stdout.write('\n');
+      stdout.write(formatFundingInstructions(created.address, stdoutOptions));
       return 0;
     } catch (error) {
-      stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+      stderr.write(
+        `${formatLogLine('error', error instanceof Error ? error.message : String(error), stderrOptions)}\n`
+      );
       return 1;
     }
   }
@@ -120,31 +154,60 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
   if (parsed.command === 'wallet-address') {
     const wallet = resolveWallet();
     if (!wallet) {
-      stderr.write(`No Tempo wallet found. Run \`${CLI_NAME} wallet init\` or set TEMPO_PRIVATE_KEY.\n`);
+      stderr.write(
+        `${formatLogLine(
+          'error',
+          `No Tempo wallet found. Run \`${CLI_NAME} wallet init\` or set TEMPO_PRIVATE_KEY.`,
+          stderrOptions
+        )}\n`
+      );
       return 1;
     }
-    stdout.write(`${formatWalletInfo(wallet)}\n`);
+
+    stdout.write(
+      formatWalletInfo(wallet, stdoutOptions, [
+        ['Network', TEMPO_NETWORK],
+        ['Explorer', `${TEMPO_EXPLORER}/address/${wallet.address}`]
+      ])
+    );
     return 0;
+  }
+
+  if (parsed.command === 'wallet-balance') {
+    try {
+      const report = await walletBalance();
+      stdout.write(formatWalletBalance(report, stdoutOptions));
+      return 0;
+    } catch (error) {
+      stderr.write(
+        `${formatLogLine('error', error instanceof Error ? error.message : String(error), stderrOptions)}\n`
+      );
+      return 1;
+    }
   }
 
   if (parsed.command === 'recover') {
     const logProgress = (event: TempoRecoveryProgressEvent) => {
-      stderr.write(`[${event.step}] ${event.message}\n`);
+      stderr.write(`${formatLogLine(event.step, event.message, stderrOptions)}\n`);
       if (parsed.verbose && event.detail) {
-        stderr.write(`${JSON.stringify(event.detail)}\n`);
+        stderr.write(`${formatProgressDetail(event.detail, stderrOptions)}\n`);
       }
     };
 
     try {
       const report = await recover({ onProgress: logProgress });
-      stdout.write(parsed.json ? `${JSON.stringify(report, null, 2)}\n` : formatRecoveryReport(report));
+      stdout.write(
+        parsed.json ? `${JSON.stringify(report, null, 2)}\n` : formatRecoveryReport(report, stdoutOptions)
+      );
       return report.results.some(
         (result) => result.status === 'failed' || result.status === 'skipped-wallet-mismatch'
       )
         ? 1
         : 0;
     } catch (error) {
-      stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+      stderr.write(
+        `${formatLogLine('error', error instanceof Error ? error.message : String(error), stderrOptions)}\n`
+      );
       return 1;
     }
   }
@@ -153,31 +216,48 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
 
   if (!resolveWallet()) {
     if (isInteractive()) {
-      stderr.write('No Tempo wallet found.\n');
+      stderr.write(`${formatLogLine('wallet', 'No Tempo wallet found.', stderrOptions)}\n`);
       const shouldCreate = await confirm('Create a local Tempo wallet and store it in your system keychain?', true);
       if (!shouldCreate) {
-        stderr.write(`Canceled. Run \`${CLI_NAME} wallet init\` when you are ready.\n`);
+        stderr.write(
+          `${formatLogLine('error', `Canceled. Run \`${CLI_NAME} wallet init\` when you are ready.`, stderrOptions)}\n`
+        );
         return 1;
       }
 
       try {
         const wallet = createWallet();
-        stderr.write(`[wallet] Created ${wallet.address} (${wallet.source})\n`);
-        stderr.write(`${formatWalletFundingMessage(wallet.address)}\n`);
+        stderr.write(
+          formatWalletInfo(wallet, stderrOptions, [
+            ['Status', 'Created wallet'],
+            ['Network', TEMPO_NETWORK],
+            ['Explorer', `${TEMPO_EXPLORER}/address/${wallet.address}`]
+          ])
+        );
+        stderr.write('\n');
+        stderr.write(formatFundingInstructions(wallet.address, stderrOptions));
       } catch (error) {
-        stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+        stderr.write(
+          `${formatLogLine('error', error instanceof Error ? error.message : String(error), stderrOptions)}\n`
+        );
         return 1;
       }
     } else {
-      stderr.write(`No Tempo wallet found. Run \`${CLI_NAME} wallet init\` or set TEMPO_PRIVATE_KEY.\n`);
+      stderr.write(
+        `${formatLogLine(
+          'error',
+          `No Tempo wallet found. Run \`${CLI_NAME} wallet init\` or set TEMPO_PRIVATE_KEY.`,
+          stderrOptions
+        )}\n`
+      );
       return 1;
     }
   }
 
   const logProgress = (event: ProgressEvent) => {
-    stderr.write(`[${event.step}] ${event.message}\n`);
+    stderr.write(`${formatLogLine(event.step, event.message, stderrOptions)}\n`);
     if (summarizeArgs.verbose && event.detail) {
-      stderr.write(`${JSON.stringify(event.detail)}\n`);
+      stderr.write(`${formatProgressDetail(event.detail, stderrOptions)}\n`);
     }
   };
 
@@ -192,27 +272,35 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
 
     if (summarizeArgs.outputPath) {
       await writeFile(summarizeArgs.outputPath, payload, 'utf8');
-      stderr.write(`[write] Wrote output to ${summarizeArgs.outputPath}\n`);
+      stderr.write(
+        `${formatLogLine('write', `Wrote output to ${summarizeArgs.outputPath}`, stderrOptions)}\n`
+      );
     } else {
       stdout.write(payload);
     }
 
-    stderr.write(formatPaymentSummary(result));
+    stderr.write(formatPaymentSummary(result, stderrOptions));
 
     if (summarizeArgs.verbose) {
       stderr.write(
-        `[done] detail=${result.detail} chunks=${result.debug.chunkCount} calls=${result.debug.modelCallCount} spent=${result.payment.spent}\n`
+        `${formatLogLine(
+          'done',
+          `detail=${result.detail} chunks=${result.debug.chunkCount} calls=${result.debug.modelCallCount} spent=${result.payment.spent}`,
+          stderrOptions
+        )}\n`
       );
     }
 
     if (result.payment.closeError) {
-      stderr.write(`[warning] ${result.payment.closeError}\n`);
+      stderr.write(`${formatLogLine('warning', result.payment.closeError, stderrOptions)}\n`);
       return 1;
     }
 
     return 0;
   } catch (error) {
-    stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+    stderr.write(
+      `${formatLogLine('error', error instanceof Error ? error.message : String(error), stderrOptions)}\n`
+    );
     return 1;
   }
 }
@@ -300,7 +388,7 @@ function parseRecoverArgs(argv: string[]): RecoverArgs {
   };
 }
 
-function parseWalletArgs(argv: string[]): WalletInitArgs | WalletAddressArgs {
+function parseWalletArgs(argv: string[]): WalletInitArgs | WalletAddressArgs | WalletBalanceArgs {
   if (argv[0] === 'init' || argv[0] === 'create') {
     for (const argument of argv.slice(1)) {
       if (argument === '--force' || argument === '-f') {
@@ -324,7 +412,17 @@ function parseWalletArgs(argv: string[]): WalletInitArgs | WalletAddressArgs {
     return { command: 'wallet-address' };
   }
 
-  throw new Error('Expected `wallet init`, `wallet create`, `wallet address`, or `wallet addr`.');
+  if (argv[0] === 'balance' || argv[0] === 'bal') {
+    if (argv.length > 1) {
+      throw new Error(`Unknown argument: ${argv[1]}`);
+    }
+
+    return { command: 'wallet-balance' };
+  }
+
+  throw new Error(
+    'Expected `wallet init`, `wallet create`, `wallet address`, `wallet addr`, `wallet balance`, or `wallet bal`.'
+  );
 }
 
 function parseSummarizeArgs(argv: string[]): SummarizeArgs {
@@ -432,65 +530,6 @@ function parseDetail(value: string): SummarizeArgs['detail'] {
   }
 
   return value;
-}
-
-function formatWalletInfo(wallet: TempoWalletInfo): string {
-  return `Wallet ${wallet.address} (source=${wallet.source})`;
-}
-
-function formatRecoveryReport(report: TempoRecoveryReport): string {
-  const lines = [`Recovery store: ${report.storePath}`];
-
-  if (report.results.length === 0) {
-    lines.push('No recoverable Tempo sessions found.');
-    return `${lines.join('\n')}\n`;
-  }
-
-  for (const result of report.results) {
-    const parts = [`${result.status} ${result.channelId}`];
-    if (result.txHash) {
-      parts.push(`tx=${result.txHash}`);
-    }
-    if (result.unlockAt) {
-      parts.push(`unlockAt=${result.unlockAt}`);
-    }
-    lines.push(parts.join(' '));
-    if (result.error) {
-      lines.push(`error: ${result.error}`);
-    }
-  }
-
-  lines.push(`Remaining recoverable channels: ${report.remainingChannels}`);
-  return `${lines.join('\n')}\n`;
-}
-
-function formatPaymentSummary(result: SummaryResult): string {
-  const parts = [`spent=${result.payment.spent}`, `cumulative=${result.payment.cumulative}`];
-  if (result.payment.channelId) {
-    parts.push(`channel=${result.payment.channelId}`);
-  }
-
-  let output = `[payment] ${parts.join(' ')}\n`;
-
-  const receipt = result.payment.finalReceipt ?? result.payment.lastReceipt;
-  if (receipt) {
-    const receiptParts: string[] = [];
-    if (typeof receipt.reference === 'string') {
-      receiptParts.push(`reference=${receipt.reference}`);
-    }
-    if (typeof receipt.txHash === 'string') {
-      receiptParts.push(`txHash=${receipt.txHash}`);
-    }
-    if (typeof receipt.challengeId === 'string') {
-      receiptParts.push(`challengeId=${receipt.challengeId}`);
-    }
-
-    if (receiptParts.length > 0) {
-      output += `[receipt] ${receiptParts.join(' ')}\n`;
-    }
-  }
-
-  return output;
 }
 
 async function confirmPrompt(message: string, defaultYes = false): Promise<boolean> {
