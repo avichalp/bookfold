@@ -6,6 +6,7 @@ import type { SummarizeBookOptions, SummaryResult, SummarizationProvider } from 
 export {
   createTempoWallet,
   formatWalletFundingMessage,
+  InvalidTempoWalletError,
   resolveTempoWallet
 } from './wallet.js';
 export { getTempoWalletBalance } from './wallet-balance.js';

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { InvalidTempoWalletError } from '@bookfold/sdk';
 import { runCli } from '../src/index.js';
 
 class BufferWriter {
@@ -68,5 +69,58 @@ test('runCli renders wallet balance output', async () => {
   assert.match(stdout.output, /Balance/);
   assert.match(stdout.output, /2\.75 USDC/);
   assert.match(stdout.output, /1\.5 pathUSD/);
+  assert.equal(stderr.output, '');
+});
+
+test('runCli wallet init recreates invalid Bookfold secure-store entries', async () => {
+  const stdout = new BufferWriter();
+  const stderr = new BufferWriter();
+
+  const exitCode = await runCli(['wallet', 'init'], {
+    stdout,
+    stderr,
+    resolveWallet: () => {
+      throw new InvalidTempoWalletError('app');
+    },
+    createWallet: () => ({
+      address: '0x1111111111111111111111111111111111111111',
+      source: 'app',
+      accountName: 'default',
+      serviceName: 'bookfold'
+    })
+  });
+
+  assert.equal(exitCode, 0);
+  assert.match(stdout.output, /Created wallet/);
+  assert.match(stdout.output, /0x1111111111111111111111111111111111111111/);
+  assert.equal(stderr.output, '');
+});
+
+test('runCli wallet init --force ignores invalid mppx fallback wallets', async () => {
+  const stdout = new BufferWriter();
+  const stderr = new BufferWriter();
+  let receivedOptions: { overwrite?: boolean | undefined } | undefined;
+
+  const exitCode = await runCli(['wallet', 'init', '--force'], {
+    stdout,
+    stderr,
+    resolveWallet: () => {
+      throw new InvalidTempoWalletError('mppx');
+    },
+    createWallet: (options) => {
+      receivedOptions = options;
+      return {
+        address: '0x1111111111111111111111111111111111111111',
+        source: 'app',
+        accountName: 'default',
+        serviceName: 'bookfold'
+      };
+    }
+  });
+
+  assert.equal(exitCode, 0);
+  assert.deepEqual(receivedOptions, { overwrite: true });
+  assert.match(stdout.output, /Recreated wallet/);
+  assert.match(stdout.output, /0x1111111111111111111111111111111111111111/);
   assert.equal(stderr.output, '');
 });
