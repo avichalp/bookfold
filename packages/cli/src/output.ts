@@ -5,7 +5,6 @@ import {
   type TempoWalletBalanceReport,
   type TempoWalletInfo
 } from '@bookfold/sdk';
-import { formatUnits } from 'viem';
 
 interface OutputOptions {
   color?: boolean | undefined;
@@ -71,9 +70,28 @@ function trimDecimal(value: string): string {
   return value.replace(/\.0+$|(\.\d*?)0+$/, '$1');
 }
 
+function formatDecimalUnits(value: bigint, decimals: number): string {
+  if (!Number.isInteger(decimals) || decimals <= 0) {
+    return value.toString();
+  }
+
+  const sign = value < 0n ? '-' : '';
+  const absoluteValue = value < 0n ? -value : value;
+  const divisor = 10n ** BigInt(decimals);
+  const whole = absoluteValue / divisor;
+  const fraction = absoluteValue % divisor;
+
+  if (fraction === 0n) {
+    return `${sign}${whole.toString()}`;
+  }
+
+  const fractionText = fraction.toString().padStart(decimals, '0');
+  return `${sign}${whole.toString()}.${fractionText}`;
+}
+
 function formatAtomicAmount(value: string, decimals: number, symbol: string): string {
   try {
-    return `${trimDecimal(formatUnits(BigInt(value), decimals))} ${symbol}`.trim();
+    return `${trimDecimal(formatDecimalUnits(BigInt(value), decimals))} ${symbol}`.trim();
   } catch {
     return `${value} ${symbol}`.trim();
   }
