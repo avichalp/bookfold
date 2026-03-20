@@ -553,7 +553,7 @@ async function confirmPrompt(message: string, defaultYes = false): Promise<boole
   });
 }
 
-async function main(): Promise<void> {
+export async function main(): Promise<void> {
   try {
     const exitCode = await runCli(process.argv.slice(2));
     process.exitCode = exitCode;
