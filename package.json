@@ -19,7 +19,7 @@
   },
   "scripts": {
     "build": "tsc -b",
-    "build:vercel": "bun run workflow:build && bun run build && bun run workflow:build:vercel-output",
+    "build:vercel": "bun run build && bun run workflow:build && bun run workflow:build:vercel-output",
     "bookfold": "bun run build && node packages/cli/dist/index.js",
     "bookfold:dev": "tsx packages/cli/src/index.ts",
     "clean": "rm -rf .well-known .vercel/output packages/sdk/dist packages/cli/dist packages/server/dist",
@@ -28,7 +28,7 @@
     "server:dev": "tsx packages/server/src/dev.ts",
     "smoke:hosted": "tsx packages/server/scripts/hosted-smoke.ts",
     "lint": "eslint packages",
-    "test:server": "bun run workflow:build && tsx --test packages/server/test/**/*.test.ts",
+    "test:server": "bun run build && bun run workflow:build && tsx --test packages/server/test/**/*.test.ts",
     "typecheck": "tsc -b --pretty false",
     "unlink:bookfold": "npm unlink -g bookfold",
     "dead-code": "knip --include exports,types,files --no-config-hints",
