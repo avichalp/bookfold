@@ -38,6 +38,7 @@ test('discovery routes work without runtime payment env', async () => {
   assert.equal(openApiResponse.status, 200);
   assert.equal(openApiAliasResponse.status, 200);
   assert.equal(openApiPayload.info.title, 'BookFold');
+  assert.equal(openApiPayload.info.description, 'Upload a PDF or EPUB and get a summary. Pay with MPP.');
   assert.equal(openApiPayload.paths['/v1/jobs'].post.summary, 'Create or resume a paid summary job');
   assert.equal(llmsResponse.status, 200);
   assert.match(llmsText, /POST \/v1\/uploads/);

@@ -9,7 +9,7 @@ import {
 const PUBLIC_SERVICE_NAME = 'BookFold';
 const PUBLIC_SERVICE_VERSION = '0.1.0';
 const PUBLIC_SERVICE_DESCRIPTION =
-  'Upload a PDF or EPUB, get a deterministic quote, pay over MPP, and poll for the finished summary.';
+  'Upload a PDF or EPUB and get a summary. Pay with MPP.';
 const OWNERSHIP_PROOF_PREFIX = 'mpp-verify=';
 
 export function buildOwnershipProofToken(config: ServerConfig): string {
