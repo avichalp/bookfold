@@ -20,7 +20,14 @@ import {
   type RateLimitDecision
 } from './rate-limit.js';
 import type { JobPaymentGateway, JobReader, JobStarter } from './runtime.js';
-import { buildOpenApiDocument } from './openapi.js';
+import {
+  buildFaviconSvg,
+  buildLandingPage,
+  buildLlmsText,
+  buildOpenApiDocument,
+  buildOwnershipProofToken,
+  buildWellKnownDiscovery
+} from './openapi.js';
 import { loadServerConfig, SERVER_NAME, type ServerConfig } from './config.js';
 import type { BookFoldStorage } from './storage/index.js';
 import type { QuoteRecord } from './storage/types.js';
@@ -138,7 +145,19 @@ export function createServerApp(input: ServerAppDependencies = {}): ServerApp {
       try {
         const url = new URL(request.url);
 
-        if (request.method === 'GET' && url.pathname === '/healthz') {
+        if ((request.method === 'GET' || request.method === 'HEAD') && url.pathname === '/') {
+          return html(buildLandingPage(config));
+        }
+
+        if ((request.method === 'GET' || request.method === 'HEAD') && url.pathname === '/favicon.svg') {
+          return assetText(buildFaviconSvg(), 'image/svg+xml; charset=utf-8');
+        }
+
+        if ((request.method === 'GET' || request.method === 'HEAD') && url.pathname === '/openapi.json') {
+          return discoveryJson(buildOpenApiDocument(config));
+        }
+
+        if ((request.method === 'GET' || request.method === 'HEAD') && url.pathname === '/healthz') {
           return json(
             {
               ok: true,
@@ -150,8 +169,23 @@ export function createServerApp(input: ServerAppDependencies = {}): ServerApp {
           );
         }
 
-        if (request.method === 'GET' && url.pathname === '/v1/openapi.json') {
-          return json(buildOpenApiDocument(config), 200);
+        if ((request.method === 'GET' || request.method === 'HEAD') && url.pathname === '/v1/openapi.json') {
+          return discoveryJson(buildOpenApiDocument(config));
+        }
+
+        if ((request.method === 'GET' || request.method === 'HEAD') && url.pathname === '/llms.txt') {
+          return discoveryText(buildLlmsText(config));
+        }
+
+        if ((request.method === 'GET' || request.method === 'HEAD') && url.pathname === '/.well-known/x402') {
+          return discoveryJson(buildWellKnownDiscovery(config));
+        }
+
+        if (
+          (request.method === 'GET' || request.method === 'HEAD') &&
+          url.pathname === '/.well-known/mpp-verify.txt'
+        ) {
+          return discoveryText(buildOwnershipProofToken(config));
         }
 
         if (request.method === 'POST' && url.pathname === '/v1/uploads') {
@@ -877,6 +911,40 @@ function json(payload: unknown, status = 200): Response {
       'content-type': 'application/json; charset=utf-8',
       'cache-control': 'no-store'
     }
+  });
+}
+
+function discoveryJson(payload: unknown): Response {
+  return withHeaders(json(payload, 200), {
+    'cache-control': 'public, max-age=300'
+  });
+}
+
+function text(payload: string, status = 200, contentType = 'text/plain; charset=utf-8'): Response {
+  return new Response(payload, {
+    status,
+    headers: {
+      'content-type': contentType,
+      'cache-control': 'no-store'
+    }
+  });
+}
+
+function html(payload: string): Response {
+  return withHeaders(text(payload, 200, 'text/html; charset=utf-8'), {
+    'cache-control': 'public, max-age=300'
+  });
+}
+
+function assetText(payload: string, contentType: string): Response {
+  return withHeaders(text(payload, 200, contentType), {
+    'cache-control': 'public, max-age=300'
+  });
+}
+
+function discoveryText(payload: string): Response {
+  return withHeaders(text(payload, 200), {
+    'cache-control': 'public, max-age=300'
   });
 }
 

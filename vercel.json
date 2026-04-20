@@ -5,6 +5,30 @@
   "outputDirectory": "public",
   "rewrites": [
     {
+      "source": "/",
+      "destination": "/api"
+    },
+    {
+      "source": "/favicon.svg",
+      "destination": "/api"
+    },
+    {
+      "source": "/openapi.json",
+      "destination": "/api"
+    },
+    {
+      "source": "/llms.txt",
+      "destination": "/api"
+    },
+    {
+      "source": "/.well-known/x402",
+      "destination": "/api"
+    },
+    {
+      "source": "/.well-known/mpp-verify.txt",
+      "destination": "/api"
+    },
+    {
       "source": "/healthz",
       "destination": "/api"
     },

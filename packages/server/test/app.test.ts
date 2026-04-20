@@ -97,7 +97,7 @@ test('health route returns service info', async () => {
   }
 });
 
-test('openapi shell lists MVP routes', async () => {
+test('openapi shell lists public discovery metadata', async () => {
   const tempDir = await mkdtemp(path.join(os.tmpdir(), 'bookfold-app-'));
   const client = createClient({ url: `file:${path.join(tempDir, 'bookfold.db')}`, intMode: 'number' });
   const storage = createBookFoldStorage({ client });
@@ -113,14 +113,22 @@ test('openapi shell lists MVP routes', async () => {
       blobStore: new MemoryBlobStore()
     });
 
-    const response = await app.fetch(new Request('https://bookfold.test/v1/openapi.json'));
+    const response = await app.fetch(new Request('https://bookfold.test/openapi.json'));
     const payload = await response.json();
 
     assert.equal(response.status, 200);
     assert.equal(payload.openapi, '3.1.0');
+    assert.equal(payload.info['x-guidance'].includes('POST /v1/uploads'), true);
+    assert.deepEqual(payload['x-service-info'].docs, {
+      homepage: 'https://bookfold.test/',
+      apiReference: 'https://bookfold.test/openapi.json',
+      llms: 'https://bookfold.test/llms.txt'
+    });
+    assert.deepEqual(payload['x-discovery'].ownershipProofs, ['mpp-verify=bookfold.test']);
     assert.ok(payload.paths['/v1/uploads']);
     assert.ok(payload.paths['/v1/quotes']);
     assert.ok(payload.paths['/v1/jobs']);
+    assert.equal(payload.paths['/v1/jobs'].post['x-payment-info'].protocols[0].mpp.method, 'tempo');
   } finally {
     await storage.close();
   }
