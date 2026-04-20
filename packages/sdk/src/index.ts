@@ -2,6 +2,28 @@ import { parseBookFromFile } from './book/index.js';
 import { OpenAiMppProvider } from './provider/openai-mpp.js';
 import { summarizeParsedBook } from './summarize/index.js';
 import type { SummarizeBookOptions, SummaryResult, SummarizationProvider } from './types.js';
+export {
+  CHUNK_MAX_TOKENS,
+  CHUNK_OVERLAP_TOKENS,
+  MAX_FILE_BYTES,
+  OPENAI_MPP_BASE_URL,
+  PARSER_VERSION,
+  PINNED_MODEL_IDS,
+  PRICE_SHEET_VERSION,
+  PROMPT_VERSION,
+  TOKENIZER_VERSION
+} from './config.js';
+export { buildSummaryPlan, executeSummaryPlan, hashSummaryPlan, serializeSummaryPlan } from './plan/index.js';
+export type {
+  SummaryPlan,
+  SummaryPlanCall,
+  SummaryPlanChunk,
+  SummaryPlanChunkCall,
+  SummaryPlanNotesCall
+} from './plan/index.js';
+export { DEFAULT_PRICE_SHEET, priceSummaryPlan } from './pricing/index.js';
+export type { ModelPrice, PriceSheet, PlanPriceLine, SummaryPlanPrice } from './pricing/types.js';
+export { countPromptTokenBudget, countPromptTokens, countTextTokens } from './tokenize/index.js';
 
 export {
   createTempoWallet,
@@ -9,6 +31,7 @@ export {
   InvalidTempoWalletError,
   resolveTempoWallet
 } from './wallet.js';
+export { OpenAiMppProvider } from './provider/openai-mpp.js';
 export { getTempoWalletBalance } from './wallet-balance.js';
 export { recoverTempoSessions } from './recovery.js';
 export type {
@@ -17,10 +40,17 @@ export type {
   TempoRecoveryReport
 } from './recovery.js';
 export type {
+  ChargePaymentSummary,
+  DetailLevel,
+  PaymentReceiptSummary,
+  PaymentSummary,
   ProgressEvent,
+  SessionPaymentSummary,
   SummarizeBookOptions,
+  SummarizationProvider,
   SummaryResult
 } from './types.js';
+export type { ParsedBook } from './book/types.js';
 export type { TempoWalletInfo } from './wallet.js';
 export type {
   TempoWalletAssetBalance,
@@ -111,3 +141,5 @@ export async function summarizeBook(options: SummarizeBookOptions): Promise<Summ
     warnings: warnings.length > 0 ? warnings : undefined
   };
 }
+
+export { detectBookFileType, parseBookFromBuffer, parseBookFromFile } from './book/index.js';

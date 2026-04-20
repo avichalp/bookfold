@@ -1,20 +1,81 @@
 # Bookfold
 
-local book summaries for PDF and EPUB. parse on-device, summarize through OpenAI's MPP endpoint, pay through Tempo, print locally, and close the session when the run ends.
+BookFold has two modes:
+
+- local CLI
+- hosted MPP server
+
+It summarizes PDF and EPUB books.
+
+The CLI parses on-device.
+The hosted server accepts uploads, returns quotes, runs jobs, and serves results.
 
 ## features
 
+CLI:
+
 - local PDF and EPUB parsing
-- deterministic chunking with `short`, `medium`, and `long` summary modes
+- deterministic `short`, `medium`, and `long` summary modes
 - direct paid requests to `https://openai.mpp.tempo.xyz/v1/chat/completions`
 - one Tempo session per summarize run
 - manual recovery for interrupted runs with `recover`
 
+Hosted server:
+
+- direct upload to private Blob storage
+- deterministic quote from a frozen summary plan
+- paid job create over MPP
+- async job execution with Vercel Workflow
+- job state and payment records in Turso
+
+## architecture
+
+```text
+CLI
+  book file
+    -> local parse
+    -> local plan
+    -> OpenAI MPP
+    -> summary
+
+Hosted API
+  client
+    -> POST /v1/uploads
+    -> Blob PUT
+    -> POST /v1/quotes
+    -> POST /v1/jobs
+    <- 402 challenge
+    -> POST /v1/jobs (paid retry)
+    -> GET /v1/jobs/:id
+
+  server
+    -> Blob
+    -> Turso
+    -> Vercel Workflow
+    -> OpenAI MPP
+```
+
+## docs
+
+- API: [docs/mpp-server-api.md](./docs/mpp-server-api.md)
+- Deploy: [docs/mpp-server-deploy.md](./docs/mpp-server-deploy.md)
+- Readiness: [docs/mpp-server-production-readiness-plan.md](./docs/mpp-server-production-readiness-plan.md)
+
 ## requirements
 
-- Node `>=22.6.0`
+CLI:
+
+- Node `22.x`
 - a funded Tempo wallet
 - `.pdf` or `.epub` input
+
+Hosted server:
+
+- Vercel
+- Blob
+- Turso
+- a server Tempo wallet
+- `MPP_SECRET_KEY`
 
 limits and caveats:
 
@@ -31,7 +92,7 @@ wallet storage:
 
 ## install
 
-published package:
+CLI package:
 
 ```bash
 npm install -g bookfold
@@ -65,11 +126,12 @@ verification:
 
 ```bash
 bun run verify
+bun run build:vercel
 ```
 
 ## setup
 
-initialize a wallet:
+CLI wallet setup:
 
 ```bash
 bookfold wallet init
@@ -87,9 +149,13 @@ wallet lookup order:
 
 if no wallet exists and the CLI is interactive, `bookfold` will offer to create one during `summarize`.
 
+Hosted server setup lives here:
+
+- [docs/mpp-server-deploy.md](./docs/mpp-server-deploy.md)
+
 ## usage
 
-once `bookfold` is installed globally or linked from this repo:
+CLI:
 
 ```bash
 bookfold ./book.pdf
@@ -107,6 +173,18 @@ bun run bookfold ./book.pdf
 bun run bookfold:dev ./book.pdf
 ```
 
+Hosted API flow:
+
+```text
+1. POST /v1/uploads
+2. upload file to Blob
+3. POST /v1/quotes
+4. POST /v1/jobs
+5. handle 402
+6. retry POST /v1/jobs with payment
+7. GET /v1/jobs/:id until done
+```
+
 ## CLI behavior
 
 - passing a file path defaults to `summarize`
@@ -120,9 +198,9 @@ bun run bookfold:dev ./book.pdf
 
 ## detail modes
 
-- `short`: `gpt-4o-mini`, target `150-300` words, single-pass for very small books, otherwise light map-reduce
-- `medium`: `gpt-4o`, target `500-900` words, map-reduce
-- `long`: `gpt-4o`, target `1200-1800` words, section-aware map-reduce
+- `short`: `gpt-4o-mini-2024-07-18`, target `150-300` words, single-pass for very small books, otherwise light map-reduce
+- `medium`: `gpt-4o-2024-11-20`, target `500-900` words, map-reduce
+- `long`: `gpt-4o-2024-11-20`, target `1200-1800` words, section-aware map-reduce
 
 ## sdk
 
@@ -147,8 +225,22 @@ other exported helpers:
 
 - wallet: `createTempoWallet`, `resolveTempoWallet`, `formatWalletFundingMessage`, `getTempoWalletBalance`
 - recovery: `recoverTempoSessions`
+- planning: `buildSummaryPlan`, `hashSummaryPlan`, `serializeSummaryPlan`
+- pricing: `DEFAULT_PRICE_SHEET`, `priceSummaryPlan`
+- token counting: `countTextTokens`, `countPromptTokens`, `countPromptTokenBudget`
+- parsing: `detectBookFileType`, `parseBookFromBuffer`, `parseBookFromFile`
 
 `summarizeBook` always attempts to close the provider in a `finally` block. if summarization succeeds but session close fails, the result is still returned and the close failure is attached to `payment.closeError` and `warnings`.
+
+server-facing SDK exports:
+
+- `@bookfold/sdk/server`
+- `DEFAULT_PRICE_SHEET`
+- `priceSummaryPlan`
+- `buildSummaryPlan`
+- `hashSummaryPlan`
+- `detectBookFileType`
+- `parseBookFromBuffer`
 
 ## recovery
 
@@ -166,7 +258,14 @@ if a run dies after opening a channel, Bookfold stores minimal recovery metadata
 
 ## limits
 
-- local CLI only
+CLI:
+
 - one in-memory Tempo session per summarize run
 - no OCR for scanned PDFs
 - no DRM bypass for EPUBs
+
+Hosted server:
+
+- upload, quote, job-create, and job-read routes are rate-limited
+- source books and summary artifacts are stored remotely
+- async jobs run through Vercel Workflow

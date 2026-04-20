@@ -79,6 +79,7 @@ test('formatPaymentSummary renders human-readable Tempo amounts', () => {
         fileType: 'pdf'
       },
       payment: {
+        kind: 'session',
         provider: 'openai-mpp',
         spent: '22000',
         cumulative: '45000',
@@ -92,7 +93,7 @@ test('formatPaymentSummary renders human-readable Tempo amounts', () => {
       debug: {
         chunkCount: 2,
         modelCallCount: 1,
-        modelNames: ['gpt-4o']
+        modelNames: ['gpt-4o-2024-11-20']
       }
     },
     { color: false }

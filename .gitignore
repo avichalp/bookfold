@@ -47,3 +47,5 @@ Thumbs.db
 
 # Local protocol docs
 docs/machine-payments-protocol.md
+.vercel
+.well-known/workflow/

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "bun run build:vercel",
+  "installCommand": "bun install",
+  "outputDirectory": "public",
+  "rewrites": [
+    {
+      "source": "/healthz",
+      "destination": "/api"
+    },
+    {
+      "source": "/v1/:path*",
+      "destination": "/api"
+    },
+    {
+      "source": "/.well-known/workflow/v1/webhook/:token",
+      "destination": "/.well-known/workflow/v1/webhook/[token]"
+    }
+  ]
+}

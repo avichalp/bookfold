@@ -10,21 +10,32 @@
   "workspaces": [
     "packages/*"
   ],
+  "dependencies": {
+    "@bookfold/sdk": "workspace:*",
+    "@bookfold/server": "workspace:*"
+  },
   "engines": {
-    "node": ">=22.6.0"
+    "node": "22.x"
   },
   "scripts": {
     "build": "tsc -b",
+    "build:vercel": "bun run workflow:build && bun run build && bun run workflow:build:vercel-output",
     "bookfold": "bun run build && node packages/cli/dist/index.js",
     "bookfold:dev": "tsx packages/cli/src/index.ts",
-    "clean": "rm -rf packages/sdk/dist packages/cli/dist",
+    "clean": "rm -rf .well-known .vercel/output packages/sdk/dist packages/cli/dist packages/server/dist",
     "link:bookfold": "bun run build && npm link --workspace bookfold",
+    "server:build": "tsc -b packages/server",
+    "server:dev": "tsx packages/server/src/dev.ts",
+    "smoke:hosted": "tsx packages/server/scripts/hosted-smoke.ts",
     "lint": "eslint packages",
+    "test:server": "bun run workflow:build && tsx --test packages/server/test/**/*.test.ts",
     "typecheck": "tsc -b --pretty false",
     "unlink:bookfold": "npm unlink -g bookfold",
     "dead-code": "knip --include exports,types,files --no-config-hints",
     "test": "tsx --test packages/sdk/test/**/*.test.ts packages/cli/test/**/*.test.ts",
-    "verify": "bun run typecheck && bun run test"
+    "verify": "bun run typecheck && bun run workflow:build && bun run test && bun run test:server",
+    "workflow:build": "bunx workflow build",
+    "workflow:build:vercel-output": "bunx workflow build --target vercel-build-output-api"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -34,6 +45,7 @@
     "pdf-lib": "^1.17.1",
     "tsx": "^4.19.3",
     "typescript": "^5.8.2",
-    "typescript-eslint": "^8.57.1"
+    "typescript-eslint": "^8.57.1",
+    "workflow": "^4.2.2"
   }
 }

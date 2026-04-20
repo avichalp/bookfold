@@ -3,7 +3,6 @@ import path from 'node:path';
 import { MAX_FILE_BYTES } from '../config.js';
 import type { BookFileType } from '../types.js';
 import { parseEpub } from './epub.js';
-import { parsePdf } from './pdf.js';
 import type { ParsedBook } from './types.js';
 
 export async function parseBookFromFile(filePath: string): Promise<ParsedBook> {
@@ -21,15 +20,41 @@ export async function parseBookFromFile(filePath: string): Promise<ParsedBook> {
   const fileType = detectBookFileType(filePath);
   const fileBuffer = await readFile(filePath);
 
+  return parseBookFromBuffer({
+    fileBuffer,
+    filePath,
+    fileType
+  });
+}
+
+export async function parseBookFromBuffer(input: {
+  fileBuffer: Buffer | Uint8Array;
+  filePath: string;
+  fileType?: BookFileType | undefined;
+}): Promise<ParsedBook> {
+  const fileBuffer = Buffer.isBuffer(input.fileBuffer)
+    ? input.fileBuffer
+    : Buffer.from(input.fileBuffer);
+
+  if (fileBuffer.byteLength > MAX_FILE_BYTES) {
+    throw new Error(
+      `Input file is too large (${formatBytes(fileBuffer.byteLength)}). The current limit is ${formatBytes(MAX_FILE_BYTES)}.`
+    );
+  }
+
+  const fileType = input.fileType ?? detectBookFileType(input.filePath);
+
   switch (fileType) {
-    case 'pdf':
-      return parsePdf(filePath, fileBuffer);
+    case 'pdf': {
+      const { parsePdf } = await import('./pdf.js');
+      return parsePdf(input.filePath, fileBuffer);
+    }
     case 'epub':
-      return parseEpub(filePath, fileBuffer);
+      return parseEpub(input.filePath, fileBuffer);
   }
 }
 
-function detectBookFileType(filePath: string): BookFileType {
+export function detectBookFileType(filePath: string): BookFileType {
   const extension = path.extname(filePath).toLowerCase();
 
   if (extension === '.pdf') {

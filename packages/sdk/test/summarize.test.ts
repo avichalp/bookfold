@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { MAP_CONCURRENCY } from '../src/config.js';
 import { summarizeParsedBook } from '../src/summarize/index.js';
 import type {
   GenerateTextRequest,
@@ -120,4 +121,34 @@ test('long detail uses section-aware map-reduce when TOC data exists', async () 
   assert.equal(provider.calls.length, 5);
   assert.ok(countWords(result.summary) >= 1200);
   assert.ok(countWords(result.summary) <= 1800);
+});
+
+test('medium detail runs independent map calls with bounded concurrency', async () => {
+  class SlowProvider extends MockProvider {
+    inFlight = 0;
+    maxInFlight = 0;
+
+    override async generateText(request: GenerateTextRequest): Promise<GenerateTextResult> {
+      this.inFlight += 1;
+      this.maxInFlight = Math.max(this.maxInFlight, this.inFlight);
+
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        return await super.generateText(request);
+      } finally {
+        this.inFlight -= 1;
+      }
+    }
+  }
+
+  const provider = new SlowProvider();
+  const result = await summarizeParsedBook({
+    book: createBook(7),
+    detail: 'medium',
+    provider
+  });
+
+  assert.equal(result.debug.strategy, 'map-reduce');
+  assert.ok(provider.maxInFlight > 1);
+  assert.ok(provider.maxInFlight <= MAP_CONCURRENCY);
 });

@@ -1,0 +1,21 @@
+{
+  "version": "bookfold-price-v1",
+  "currency": "USD",
+  "currencyDecimals": 6,
+  "safetyBufferBps": 1200,
+  "bookfoldFeeMicrosUsd": {
+    "short": "50000",
+    "medium": "150000",
+    "long": "350000"
+  },
+  "models": {
+    "gpt-4o-mini-2024-07-18": {
+      "inputMicrosUsdPerMillionTokens": "150000",
+      "outputMicrosUsdPerMillionTokens": "600000"
+    },
+    "gpt-4o-2024-11-20": {
+      "inputMicrosUsdPerMillionTokens": "2500000",
+      "outputMicrosUsdPerMillionTokens": "10000000"
+    }
+  }
+}

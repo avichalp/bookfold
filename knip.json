@@ -1,6 +1,29 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [],
+  "project": [],
+  "ignoreFiles": [
+    "api/index.ts",
+    "workflows/bookfold-job.ts",
+    "docs/examples/**"
+  ],
   "workspaces": {
+    "api": {
+      "entry": [
+        "index.ts"
+      ],
+      "project": [
+        "**/*.ts"
+      ]
+    },
+    "workflows": {
+      "entry": [
+        "bookfold-job.ts"
+      ],
+      "project": [
+        "**/*.ts"
+      ]
+    },
     "packages/sdk": {
       "entry": [
         "src/index.ts"
@@ -15,6 +38,20 @@
       ],
       "project": [
         "src/**/*.ts"
+      ]
+    },
+    "packages/server": {
+      "entry": [
+        "src/index.ts",
+        "src/api.ts",
+        "src/dev.ts",
+        "scripts/hosted-smoke.ts",
+        "test/**/*.test.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "scripts/**/*.ts",
+        "test/**/*.ts"
       ]
     }
   }

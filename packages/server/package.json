@@ -1,0 +1,25 @@
+{
+  "name": "@bookfold/server",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./api": {
+      "types": "./dist/api.d.ts",
+      "import": "./dist/api.js"
+    }
+  },
+  "dependencies": {
+    "@bookfold/sdk": "workspace:*",
+    "@libsql/client": "^0.17.2",
+    "@vercel/blob": "^2.3.3",
+    "mppx": "^0.5.13",
+    "viem": "^2.39.0",
+    "workflow": "^4.2.2"
+  }
+}

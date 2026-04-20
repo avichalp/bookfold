@@ -2,7 +2,7 @@ import {
   OPENAI_MPP_BASE_URL,
   OPENAI_MPP_CHAT_COMPLETIONS_PATH
 } from '../config.js';
-import { createTempoRecoveryStore } from '../recovery.js';
+import { createTempoRecoveryStore, type TempoRecoveryStore } from '../recovery.js';
 import { TempoSessionClient } from '../session/tempo.js';
 import type {
   GenerateTextRequest,
@@ -10,6 +10,13 @@ import type {
   SummaryPaymentResult,
   SummarizationProvider
 } from '../types.js';
+
+interface OpenAiMppProviderOptions {
+  baseUrl?: string | undefined;
+  endpointPath?: string | undefined;
+  privateKey?: `0x${string}` | undefined;
+  recoveryStore?: TempoRecoveryStore | undefined;
+}
 
 interface OpenAiChatCompletionResponse {
   id?: string;
@@ -33,11 +40,12 @@ export class OpenAiMppProvider implements SummarizationProvider {
 
   private readonly session: TempoSessionClient;
 
-  constructor() {
-    this.baseUrl = OPENAI_MPP_BASE_URL;
-    this.endpointPath = OPENAI_MPP_CHAT_COMPLETIONS_PATH;
+  constructor(options: OpenAiMppProviderOptions = {}) {
+    this.baseUrl = options.baseUrl ?? OPENAI_MPP_BASE_URL;
+    this.endpointPath = options.endpointPath ?? OPENAI_MPP_CHAT_COMPLETIONS_PATH;
     this.session = new TempoSessionClient({
-      recoveryStore: createTempoRecoveryStore()
+      ...(options.privateKey ? { privateKey: options.privateKey } : {}),
+      recoveryStore: options.recoveryStore ?? createTempoRecoveryStore()
     });
   }
 
@@ -82,6 +90,7 @@ export class OpenAiMppProvider implements SummarizationProvider {
   getPaymentSummary(): SummaryPaymentResult {
     const state = this.session.paymentState;
     return {
+      kind: 'session',
       provider: 'openai-mpp',
       baseUrl: this.baseUrl,
       endpointPath: this.endpointPath,

@@ -8,10 +8,21 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./config": {
+      "types": "./dist/config.d.ts",
+      "import": "./dist/config.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js"
     }
   },
   "dependencies": {
+    "@napi-rs/canvas": "^0.1.80",
     "fast-xml-parser": "^5.3.5",
+    "geometry-interfaces": "^2.0.0",
+    "js-tiktoken": "^1.0.21",
     "jszip": "^3.10.1",
     "mppx": "^0.4.7",
     "pdfjs-dist": "^5.4.394",

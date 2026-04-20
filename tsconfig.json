@@ -6,6 +6,15 @@
     },
     {
       "path": "./packages/cli"
+    },
+    {
+      "path": "./packages/server"
+    },
+    {
+      "path": "./workflows"
+    },
+    {
+      "path": "./api"
     }
   ],
   "compilerOptions": {
@@ -29,6 +38,12 @@
     "paths": {
       "@bookfold/sdk": [
         "./packages/sdk/src/index.ts"
+      ],
+      "@bookfold/server": [
+        "./packages/server/src/index.ts"
+      ],
+      "@bookfold/server/api": [
+        "./packages/server/src/api.ts"
       ]
     }
   }

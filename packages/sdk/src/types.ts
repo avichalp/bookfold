@@ -25,15 +25,16 @@ export interface GenerateTextResult {
   } | undefined;
 }
 
-export interface SummaryMetadata {
-  title?: string | undefined;
-  author?: string | undefined;
-  fileType: BookFileType;
-  pageCount?: number | undefined;
-  chapterCount?: number | undefined;
+export interface PaymentReceiptSummary {
+  method: string;
+  reference: string;
+  externalId?: string | undefined;
+  status: 'success';
+  timestamp: string;
 }
 
-export interface SummaryPaymentResult {
+export interface SessionPaymentSummary {
+  kind: 'session';
   provider: 'openai-mpp';
   baseUrl?: string | undefined;
   endpointPath?: string | undefined;
@@ -46,6 +47,41 @@ export interface SummaryPaymentResult {
   closeError?: string | undefined;
   requestCount?: number | undefined;
 }
+
+export interface ChargePaymentSummary {
+  kind: 'charge';
+  provider: string;
+  amount: string;
+  currency: string;
+  receipt?: PaymentReceiptSummary | undefined;
+  status: 'pending' | 'paid' | 'failed';
+  detail?: Record<string, unknown> | undefined;
+}
+
+export interface SummaryMetadata {
+  title?: string | undefined;
+  author?: string | undefined;
+  fileType: BookFileType;
+  pageCount?: number | undefined;
+  chapterCount?: number | undefined;
+}
+
+export interface SummaryPaymentResult {
+  kind: 'session';
+  provider: 'openai-mpp';
+  baseUrl?: string | undefined;
+  endpointPath?: string | undefined;
+  maxDeposit?: string | undefined;
+  spent: string;
+  cumulative: string;
+  channelId?: string | undefined;
+  finalReceipt?: Record<string, unknown> | undefined;
+  lastReceipt?: Record<string, unknown> | undefined;
+  closeError?: string | undefined;
+  requestCount?: number | undefined;
+}
+
+export type PaymentSummary = SessionPaymentSummary | ChargePaymentSummary;
 
 export interface SummaryDebugInfo {
   chunkCount: number;

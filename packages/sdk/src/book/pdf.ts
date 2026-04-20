@@ -1,6 +1,7 @@
-import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
+import 'geometry-interfaces';
+import type { PDFDocumentProxy } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { chunkTextWithPages } from '../chunking.js';
 import type { ParsedBook, TocEntry } from './types.js';
 
@@ -22,8 +23,21 @@ interface PdfOutlineNode {
   items?: PdfOutlineNode[];
 }
 
+interface PdfJsModule {
+  getDocument(input: {
+    data: Uint8Array;
+    standardFontDataUrl?: string | undefined;
+  }): {
+    promise: Promise<PDFDocumentProxy>;
+  };
+}
+
+let pdfjsPromise: Promise<PdfJsModule> | undefined;
+let pdfjsWorkerPromise: Promise<Record<string, unknown>> | undefined;
+
 export async function parsePdf(filePath: string, fileBuffer: Buffer): Promise<ParsedBook> {
-  let pdf: pdfjs.PDFDocumentProxy | undefined;
+  const pdfjs = await loadPdfJs();
+  let pdf: PDFDocumentProxy | undefined;
 
   try {
     const uint8Array = new Uint8Array(fileBuffer);
@@ -117,7 +131,20 @@ export async function parsePdf(filePath: string, fileBuffer: Buffer): Promise<Pa
   }
 }
 
-async function extractOutlineEntries(pdf: pdfjs.PDFDocumentProxy): Promise<TocEntry[]> {
+async function loadPdfJs(): Promise<PdfJsModule> {
+  const [pdfjs, worker] = await Promise.all([
+    pdfjsPromise ??= import('pdfjs-dist/legacy/build/pdf.mjs'),
+    pdfjsWorkerPromise ??= import('pdfjs-dist/legacy/build/pdf.worker.mjs')
+  ]);
+
+  if (!(globalThis as { pdfjsWorker?: Record<string, unknown> }).pdfjsWorker) {
+    (globalThis as { pdfjsWorker?: Record<string, unknown> }).pdfjsWorker = worker;
+  }
+
+  return pdfjs;
+}
+
+async function extractOutlineEntries(pdf: PDFDocumentProxy): Promise<TocEntry[]> {
   let outline: PdfOutlineNode[] | null;
 
   try {
