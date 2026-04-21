@@ -185,7 +185,7 @@ Hosted API flow:
 7. GET /v1/jobs/:id until done
 ```
 
-## CLI behavior
+## cli behavior
 
 - passing a file path defaults to `summarize`
 - `summarize` also has a short alias: `sum`
