@@ -129,6 +129,22 @@ bun run verify
 bun run build:vercel
 ```
 
+## agent skill
+
+- canonical skill file: `skills/bookfold/SKILL.md`
+- install target for Codex-style agents: `~/.codex/skills/bookfold/SKILL.md`
+- published GitHub path: `https://github.com/avichalp/bookfold/tree/main/skills/bookfold`
+
+manual install:
+
+```bash
+mkdir -p ~/.codex/skills/bookfold
+curl -L https://raw.githubusercontent.com/avichalp/bookfold/main/skills/bookfold/SKILL.md \
+  -o ~/.codex/skills/bookfold/SKILL.md
+```
+
+restart Codex after installing the skill so the agent reloads it.
+
 ## setup
 
 CLI wallet setup:
